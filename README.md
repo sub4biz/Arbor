@@ -25,6 +25,14 @@ hold up on held-out data. Instead of one-shot attempts that forget what failed, 
 grows a **hypothesis tree**: every idea becomes a branch — pruned if it fails,
 harvested if it works — and insights propagate back so later ideas start smarter.
 
+Arbor emphasizes two things: **generality** and **practicality**. It is general
+because it can work on any task with an optimization target and an optimization
+metric. It is practical because it ships as both a native CLI and an Agent Skill
+Suite, making it an agent you can actually run rather than only a research
+project. For more details, visit our [project page](https://RUC-NLPIR.github.io/Arbor/)
+and read the [paper](assets/arbor_paper.pdf). For a more detailed usage manual,
+see our [documentation](https://RUC-NLPIR.github.io/Arbor/docs/).
+
 Arbor runs **two cooperating agents**:
 
 - **Coordinator** — the research director. It maintains the Idea Tree, drives the
@@ -48,7 +56,7 @@ https://github.com/user-attachments/assets/49c1a306-d2e9-49d6-9c83-65e38a62df30
 
 
 
-## CLI And Skill Versions
+## 🚀 CLI And Skill Versions
 
 This repository includes two ways to use Arbor:
 
@@ -72,7 +80,7 @@ runtime skills stored under `src/skills/`.
 
 ---
 
-## Install
+## 📦 Install
 
 **Requirements:** Python ≥ 3.10 and Git. A virtual environment is recommended.
 
@@ -90,7 +98,7 @@ arbor doctor                                        # verify PATH, git, API keys
 
 ---
 
-## Getting Started
+## ⚡ Getting Started
 
 ```bash
 arbor setup       # one-time: configure provider / model / base_url / API key
@@ -150,7 +158,7 @@ A copy-pasteable example with every option lives in
 
 ---
 
-## How It Works
+## 🧠 How It Works
 
 ### The arbor cycle
 
@@ -208,7 +216,7 @@ pollutes the Coordinator's context. See [`docs/`](docs/index.md) for the full me
 
 ---
 
-## Configuration
+## ⚙️ Configuration
 
 LLM access is configured once with `arbor setup` (stored in `~/.arbor/config.yaml`) via a
 single `provider` field — `anthropic`, `openai` (incl. any OpenAI-compatible Responses
@@ -221,7 +229,7 @@ option.
 
 ---
 
-## CLI Reference
+## 🧰 CLI Reference
 
 Day to day you only need `arbor`:
 
@@ -238,7 +246,7 @@ remain for debugging — see the [CLI reference](https://RUC-NLPIR.github.io/Arb
 
 ---
 
-## Plugins & Skills
+## 🔌 Plugins & Skills
 
 A single line retargets the agent to a new domain — evaluation protocol, protected
 data directories, required outputs, and timeout presets all come from the plugin:
@@ -254,7 +262,7 @@ demand at runtime. A copy-pasteable Kaggle config lives in
 
 ---
 
-## Output & Resume
+## 💾 Output & Resume
 
 Each run writes a session directory with `REPORT.md`, `events.jsonl`, `run_stats.json`, the
 Idea Tree, and per-experiment artifacts under `.arbor/sessions/`. Runs are resumable —
@@ -268,7 +276,7 @@ arbor --resume --run-name <run_name>      # continue an interrupted run
 
 ---
 
-## Results
+## 📊 Results
 
 Arbor was evaluated as a single controller across model training, harness engineering,
 and data synthesis — only the material, objective, evaluator, and budget change. It
@@ -289,7 +297,7 @@ for full protocols and ablations.
 
 ---
 
-## Project Structure
+## 🗂️ Project Structure
 
 The code lives in `src/` and is imported as the `research_agent` package.
 
@@ -311,7 +319,7 @@ src/                 # the `research_agent` package
 
 ---
 
-## Citation
+## 📚 Citation
 
 ```bibtex
 @misc{jin2026arbor,
@@ -327,7 +335,7 @@ src/                 # the `research_agent` package
 
 ---
 
-## License
+## 📄 License
 
 Released under the [Apache License 2.0](LICENSE).
 
