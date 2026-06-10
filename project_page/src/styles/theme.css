@@ -444,6 +444,35 @@ p {
   background: rgba(255, 255, 255, 0.06);
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lang-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 46px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--hairline-strong);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.lang-toggle:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--teal-glow);
+}
+
 /* ---- Hero --------------------------------------------------------------- */
 
 .hero {

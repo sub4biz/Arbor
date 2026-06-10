@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Magnet from '../bits/Magnet.jsx';
 import Reveal from '../components/Reveal.jsx';
 import { IconPaper, IconGithub, IconCopy, IconCheck } from '../components/icons.jsx';
+import { useLang } from '../i18n.jsx';
 
 const BIBTEX = `@misc{jin2026arbor,
   title  = {Toward Generalist Autonomous Research via Hypothesis-Tree Refinement},
@@ -14,6 +15,8 @@ const BIBTEX = `@misc{jin2026arbor,
 }`;
 
 export default function Resources() {
+  const { lang } = useLang();
+  const zh = lang === 'zh';
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -37,16 +40,17 @@ export default function Resources() {
         <div className="resources-grid">
           <Reveal>
             <div>
-              <span className="kicker">Resources</span>
-              <h2>Paper, code, and citation.</h2>
+              <span className="kicker">{zh ? '资源' : 'Resources'}</span>
+              <h2>{zh ? '论文、代码与引用。' : 'Paper, code, and citation.'}</h2>
               <p className="lead" style={{ marginTop: 18 }}>
-                Arbor is released as an open-source research system for Autonomous Optimization. The
-                report is a living technical document for an ongoing project.
+                {zh
+                  ? 'Arbor 作为面向自主优化的开源研究系统发布。该报告是一个持续进行项目的活体技术文档。'
+                  : 'Arbor is released as an open-source research system for Autonomous Optimization. The report is a living technical document for an ongoing project.'}
               </p>
               <div className="hero-actions" style={{ justifyContent: 'flex-start', marginTop: 28 }}>
                 <Magnet padding={70} magnetStrength={4}>
                   <a className="btn btn-primary" href="assets/paper/arbor.pdf" target="_blank" rel="noreferrer">
-                    <IconPaper /> Read Paper
+                    <IconPaper /> {zh ? '阅读论文' : 'Read Paper'}
                   </a>
                 </Magnet>
                 <Magnet padding={70} magnetStrength={4}>
@@ -64,7 +68,7 @@ export default function Resources() {
                 <span>BibTeX</span>
                 <button type="button" onClick={copy}>
                   {copied ? <IconCheck /> : <IconCopy />}
-                  {copied ? 'Copied' : 'Copy'}
+                  {copied ? (zh ? '已复制' : 'Copied') : (zh ? '复制' : 'Copy')}
                 </button>
               </div>
               <pre><code>{BIBTEX}</code></pre>

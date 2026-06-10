@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useReducedMotion } from './useReducedMotion';
+import { useLang } from '../i18n.jsx';
 
 const HOLD = 2000; // ms the splash stays before exiting
 const EXIT = 800; // ms exit transition
@@ -11,6 +12,7 @@ const EXIT = 800; // ms exit transition
  */
 export default function Intro() {
   const reduced = useReducedMotion();
+  const { lang } = useLang();
   const [show, setShow] = useState(!reduced);
   const [exiting, setExiting] = useState(false);
   const dismissed = useRef(false);
@@ -74,7 +76,7 @@ export default function Intro() {
           aria-label="Arbor"
           style={{ WebkitMaskImage: wm, maskImage: wm }}
         />
-        <p className="intro-tag">Autonomous Research System</p>
+        <p className="intro-tag">{lang === 'zh' ? '自主研究系统' : 'Autonomous Research System'}</p>
         <span className="intro-bar"><i /></span>
       </div>
     </div>

@@ -5,9 +5,12 @@ import Reveal from '../components/Reveal.jsx';
 import ErrorBoundary from '../components/ErrorBoundary.jsx';
 import { useReducedMotion } from '../components/useReducedMotion';
 import { IconPaper, IconGithub, IconPlay } from '../components/icons.jsx';
+import { useLang } from '../i18n.jsx';
 
 export default function Hero() {
   const reduced = useReducedMotion();
+  const { lang } = useLang();
+  const zh = lang === 'zh';
   const wm = `url(${import.meta.env.BASE_URL}assets/images/arbor-wordmark.png)`;
 
   return (
@@ -22,7 +25,7 @@ export default function Hero() {
 
       <div className="hero-inner">
         <span className="hero-eyebrow">
-          <span className="dot" /> Autonomous Research System
+          <span className="dot" /> {zh ? '自主研究系统' : 'Autonomous Research System'}
         </span>
 
         <h1 className="hero-wordmark" aria-label="Arbor">
@@ -35,9 +38,13 @@ export default function Hero() {
         </h1>
 
         <div className="hero-rotate" aria-label="Optimize anything">
-          <span className="hero-rotate-pre">Optimize</span>
+          <span className="hero-rotate-pre">{zh ? '优化' : 'Optimize'}</span>
           <RotatingText
-            texts={['anything', 'ML models', 'data pipelines', 'hypotheses', 'Kaggle scores', 'research']}
+            texts={
+              zh
+                ? ['一切', 'ML 模型', '数据流水线', '假设', 'Kaggle 分数', '研究']
+                : ['anything', 'ML models', 'data pipelines', 'hypotheses', 'Kaggle scores', 'research']
+            }
             mainClassName="hero-rotate-word"
             splitLevelClassName="hero-rotate-split"
             staggerFrom="last"
@@ -50,16 +57,25 @@ export default function Hero() {
 
         <Reveal delay={0.15} distance={26}>
           <p className="hero-title">
-            Toward Generalist Autonomous Research via{' '}
-            <span className="grad-text">Hypothesis-Tree Refinement</span>
+            {zh ? (
+              <>
+                迈向通用自主研究：基于
+                <span className="grad-text">假设树精炼</span>
+              </>
+            ) : (
+              <>
+                Toward Generalist Autonomous Research via{' '}
+                <span className="grad-text">Hypothesis-Tree Refinement</span>
+              </>
+            )}
           </p>
         </Reveal>
 
         <Reveal delay={0.25} distance={20}>
           <p className="hero-desc">
-            Arbor turns long-horizon AI research from isolated attempts into a cumulative
-            process: hypotheses branch, experiments return evidence, insights propagate, and
-            only held-out improvements are promoted.
+            {zh
+              ? 'Arbor 把长周期 AI 研究从一次次孤立的尝试，变成一个累积的过程：假设分叉、实验回传证据、洞见向上传播，只有在留出集上验证有效的改进才会被采纳。'
+              : 'Arbor turns long-horizon AI research from isolated attempts into a cumulative process: hypotheses branch, experiments return evidence, insights propagate, and only held-out improvements are promoted.'}
           </p>
         </Reveal>
 
@@ -67,7 +83,7 @@ export default function Hero() {
           <div className="hero-actions">
             <Magnet padding={70} magnetStrength={4}>
               <a className="btn btn-primary" href="assets/paper/arbor.pdf" target="_blank" rel="noreferrer">
-                <IconPaper /> Read Paper
+                <IconPaper /> {zh ? '阅读论文' : 'Read Paper'}
               </a>
             </Magnet>
             <Magnet padding={70} magnetStrength={4}>
@@ -77,7 +93,7 @@ export default function Hero() {
             </Magnet>
             <Magnet padding={70} magnetStrength={4}>
               <a className="btn" href="#case">
-                <IconPlay /> Live Demo
+                <IconPlay /> {zh ? '实时演示' : 'Live Demo'}
               </a>
             </Magnet>
           </div>
@@ -93,20 +109,19 @@ export default function Hero() {
             Hongjin Qian<sup>1</sup>, Yutao Zhu<sup>1</sup>, Zhicheng Dou<sup>1,*</sup>
           </div>
           <div className="hero-affil">
-            <sup>1</sup> Gaoling School of Artificial Intelligence, Renmin University of China
+            <sup>1</sup> {zh ? '中国人民大学高瓴人工智能学院' : 'Gaoling School of Artificial Intelligence, Renmin University of China'}
             <span className="sep" />
-            <sup>2</sup> Microsoft Research
+            <sup>2</sup> {zh ? '微软研究院' : 'Microsoft Research'}
           </div>
           <div className="hero-note">
-            <sup>†</sup> Equal contribution
+            <sup>†</sup> {zh ? '同等贡献' : 'Equal contribution'}
             <span className="sep" />
-            <sup>‡</sup> Work done during an internship at MSRA
+            <sup>‡</sup> {zh ? '于 MSRA 实习期间完成' : 'Work done during an internship at MSRA'}
             <span className="sep" />
-            <sup>*</sup> Corresponding author
+            <sup>*</sup> {zh ? '通讯作者' : 'Corresponding author'}
           </div>
           <div className="author-compact">
-            Jiajie Jin, Yuyang Hu, Kai Qiu, Qi Dai, Chong Luo, et al. · Renmin University of
-            China · Microsoft Research
+            Jiajie Jin, Yuyang Hu, Kai Qiu, Qi Dai, Chong Luo, et al. · {zh ? '中国人民大学' : 'Renmin University of China'} · {zh ? '微软研究院' : 'Microsoft Research'}
           </div>
         </Reveal>
       </div>

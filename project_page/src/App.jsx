@@ -9,10 +9,11 @@ import CaseStudy from './sections/CaseStudy.jsx';
 import WhyItMatters from './sections/WhyItMatters.jsx';
 import Resources from './sections/Resources.jsx';
 import Footer from './sections/Footer.jsx';
+import { LangProvider } from './i18n.jsx';
 
 export default function App() {
   return (
-    <>
+    <LangProvider>
       <Intro />
       <Header />
       <main>
@@ -26,6 +27,6 @@ export default function App() {
         <Resources />
       </main>
       <Footer />
-    </>
+    </LangProvider>
   );
 }

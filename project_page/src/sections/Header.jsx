@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
+import { useLang } from '../i18n.jsx';
 
 const NAV = [
-  { id: 'method', label: 'Method' },
-  { id: 'results', label: 'Results' },
-  { id: 'case', label: 'Case Study' },
-  { id: 'resources', label: 'Resources' },
+  { id: 'method', label: { en: 'Method', zh: '方法' } },
+  { id: 'results', label: { en: 'Results', zh: '结果' } },
+  { id: 'case', label: { en: 'Case Study', zh: '案例研究' } },
+  { id: 'resources', label: { en: 'Resources', zh: '资源' } },
 ];
 
 export default function Header() {
+  const { lang, setLang } = useLang();
   const [scrolled, setScrolled] = useState(false);
   const [active, setActive] = useState('');
 
@@ -41,14 +43,24 @@ export default function Header() {
       <nav className="nav" aria-label="Sections">
         {NAV.map((n) => (
           <a key={n.id} href={`#${n.id}`} className={active === n.id ? 'active' : undefined}>
-            {n.label}
+            {n.label[lang]}
           </a>
         ))}
-        <a href="docs/">Docs</a>
+        <a href="docs/">{lang === 'zh' ? '文档' : 'Docs'}</a>
       </nav>
-      <a className="header-cta" href="https://github.com/RUC-NLPIR/Arbor" target="_blank" rel="noreferrer">
-        <span>Star on</span> GitHub
-      </a>
+      <div className="header-right">
+        <button
+          type="button"
+          className="lang-toggle"
+          onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')}
+          aria-label={lang === 'zh' ? 'Switch to English' : '切换到中文'}
+        >
+          {lang === 'zh' ? 'EN' : '中文'}
+        </button>
+        <a className="header-cta" href="https://github.com/RUC-NLPIR/Arbor" target="_blank" rel="noreferrer">
+          <span>{lang === 'zh' ? 'Star on' : 'Star on'}</span> GitHub
+        </a>
+      </div>
     </header>
   );
 }
