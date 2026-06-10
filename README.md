@@ -14,6 +14,10 @@
   <a href="https://RUC-NLPIR.github.io/Arbor/docs/"><img src="https://img.shields.io/badge/Docs-Material-526CFE?style=for-the-badge&logo=materialformkdocs&logoColor=white" alt="Docs"></a>
 </p>
 
+<p align="center">
+  <b>English</b> | <a href="README.zh-CN.md">简体中文</a>
+</p>
+
 **Arbor is an autonomous research agent that turns a long-horizon objective into a
 cumulative search.** Give it a benchmark and a goal; it proposes hypotheses, edits
 code, runs real experiments, learns from the results, and keeps the improvements that
