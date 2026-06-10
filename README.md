@@ -44,7 +44,7 @@ Arbor runs **two cooperating agents**:
 ## Demo
 
 <p align="center">
-  <video src="https://raw.githubusercontent.com/RUC-NLPIR/Arbor/main/assets/demo.mp4" controls muted width="100%"></video>
+  <video src="https://RUC-NLPIR.github.io/Arbor/assets/demo/demo.mp4" controls muted width="100%"></video>
 </p>
 
 <p align="center">

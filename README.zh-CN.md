@@ -43,7 +43,7 @@ Arbor 由**两个协作智能体**组成：
 ## 演示
 
 <p align="center">
-  <video src="https://raw.githubusercontent.com/RUC-NLPIR/Arbor/main/assets/demo.mp4" controls muted width="100%"></video>
+  <video src="https://RUC-NLPIR.github.io/Arbor/assets/demo/demo.mp4" controls muted width="100%"></video>
 </p>
 
 <p align="center">
