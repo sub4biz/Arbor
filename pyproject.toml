@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "Arbor — an autonomous research agent that proposes ideas, edits code, runs experiments, and iterates on a hypothesis tree."
 readme = "README.md"
 requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 keywords = ["ai", "agent", "autonomous-research", "llm", "experimentation"]
 dependencies = [
     "anthropic>=0.52.0",
@@ -32,7 +34,7 @@ run-research = "research_agent.run:cli"
 review-research = "research_agent.review:cli"
 
 [build-system]
-requires = ["setuptools>=68.0"]
+requires = ["setuptools>=77.0"]
 build-backend = "setuptools.build_meta"
 
 # The code lives in `src/` on disk but is imported as the `research_agent`
