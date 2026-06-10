@@ -118,14 +118,6 @@ export default function IdeaTree() {
           <span><i className="dot sc-up" /> above baseline</span>
           <span><i className="dot sc-mid" /> at baseline</span>
           <span><i className="dot sc-down" /> below baseline</span>
-          <a
-            className="tree-fulllink"
-            href="assets/demo/browsecomp/dashboard.html"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open full run dashboard <span aria-hidden="true">↗</span>
-          </a>
         </div>
       </div>
     </Reveal>

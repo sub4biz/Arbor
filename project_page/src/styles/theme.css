@@ -1438,20 +1438,6 @@ p {
 .tree-legend .dot.sc-mid { background: var(--muted); }
 .tree-legend .dot.sc-down { background: #d98a8a; }
 
-.tree-fulllink {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--teal-glow);
-  font-weight: 600;
-  transition: opacity 0.2s ease;
-}
-
-.tree-fulllink:hover {
-  opacity: 0.8;
-}
-
 @media (max-width: 640px) {
   .tnode-body {
     flex-direction: column;
