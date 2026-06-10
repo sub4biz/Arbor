@@ -26,12 +26,13 @@
 
 更多详细内容欢迎查看我们的[项目主页](https://RUC-NLPIR.github.io/Arbor/)和
 [论文](assets/arbor_paper.pdf)。更详细的使用手册请参见我们的
-[文档](https://RUC-NLPIR.github.io/Arbor/docs/)。
+[文档](https://RUC-NLPIR.github.io/Arbor/docs/)。🧭 你也可以根据自己的环境与工作流，
+按需选择使用 [CLI 版或 Skill 版](#-cli-版与-skill-版)。
 
 ## 💡 为什么选择 Arbor
 
-* **通用优化能力** —— 只要任务有明确的优化对象和优化指标，Arbor 就可以胜任，无论是
-  benchmark agent、模型流水线，还是实验型代码库。
+* **通用优化能力** —— 无论是 model training、harness engineering，还是 data synthesis，
+  只要任务有明确的优化目标和可衡量的 metric，Arbor 都可以进行优化。
 * **真正可用的智能体** —— Arbor 不只是研究原型；它同时提供原生 CLI runtime 和面向
   Codex / Claude Code 的 Agent Skill Suite；需要最完整能力时可以使用 CLI，希望在其他
   coding agent 中复刻 Arbor-style 研究行为时可以加载 skill suite。
@@ -48,6 +49,12 @@
   LiteLLM 接入的 OpenAI 兼容后端，包括 DeepSeek、Gemini、Qwen、vLLM、Ollama 和本地网关。
 * **易于引导和适配** —— 实时终端仪表盘、只读 WebUI、构思/审阅阶段可选的人在回路，以及
   一行即可切换的领域插件，让你无需修改 Arbor 核心代码也能引导实验。
+
+## 🧩 框架图
+
+<p align="center">
+  <img src="assets/framework.png" alt="Arbor 框架图" width="100%">
+</p>
 
 Arbor 由**两个协作智能体**组成：
 
@@ -70,12 +77,6 @@ Arbor 由**两个协作智能体**组成：
    抽象后的经验上推到祖先节点，让后续想法继承。
 6. **决策（Decide）** —— Coordinator 决定合并、剪枝、继续、保持 pending 或停止；涉及合并时，
    使用 held-out 验证作为准入依据。
-
-## 🧩 框架图
-
-<p align="center">
-  <a href="assets/main_framework.pdf"><b>查看 Arbor 框架图（PDF）</b></a>
-</p>
 
 ## 🎬 演示
 

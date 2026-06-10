@@ -27,13 +27,15 @@ harvested if it works — and insights propagate back so later ideas start smart
 
 For more details, visit our [project page](https://RUC-NLPIR.github.io/Arbor/)
 and read the [paper](assets/arbor_paper.pdf). For a more detailed usage manual,
-see our [documentation](https://RUC-NLPIR.github.io/Arbor/docs/).
+see our [documentation](https://RUC-NLPIR.github.io/Arbor/docs/). 🧭 You can also
+choose the [CLI or Skill version](#-cli-and-skill-versions) depending on your
+environment and workflow.
 
 ## 💡 Why Arbor
 
-* **General-purpose optimization** — Arbor can work on any task with an object
-  to improve and a metric to optimize, from benchmark agents to model pipelines
-  and experimental codebases.
+* **General-purpose optimization** — From model training and harness engineering
+  to data synthesis, Arbor can optimize any task as long as it has a target to
+  improve and a metric to measure progress.
 * **Practical agent runtime** — Arbor is not only a research prototype; it ships
   with both a native CLI runtime and an Agent Skill Suite for Codex and Claude
   Code, so you can use the full CLI for the strongest Arbor behavior or load the
@@ -58,6 +60,12 @@ see our [documentation](https://RUC-NLPIR.github.io/Arbor/docs/).
   optional human-in-the-loop review, and one-line domain plugins let you steer
   experiments without changing Arbor's core code.
 
+## 🧩 Framework
+
+<p align="center">
+  <img src="assets/framework.png" alt="Arbor framework" width="100%">
+</p>
+
 Arbor runs **two cooperating agents**:
 
 - **Coordinator** — the research director. It maintains the Idea Tree, drives the
@@ -80,12 +88,6 @@ Together they repeat a six-step **arbor cycle**:
    abstracts the lesson upward so ancestor nodes and future ideas inherit it.
 6. **Decide** — the Coordinator chooses whether to merge, prune, continue, leave a
    node pending, or stop, using held-out validation for merge decisions.
-
-## 🧩 Framework
-
-<p align="center">
-  <a href="assets/main_framework.pdf"><b>View the Arbor Framework Diagram (PDF)</b></a>
-</p>
 
 ## 🎬 Demo
 
