@@ -4,18 +4,18 @@ import Reveal from '../components/Reveal.jsx';
 const ITEMS = [
   {
     n: '01',
-    t: 'Branching keeps options alive',
-    d: 'Competing hypotheses stay open instead of collapsing exploration into a single trajectory.',
+    t: 'Understanding deepens, not just scores',
+    d: 'Early branches test whether a broad mechanism holds; later ones probe where it breaks; ancestor insights compress every finding into constraints that shape the next round of hypotheses.',
   },
   {
     n: '02',
-    t: 'Insights become memory',
-    d: 'Structured insights preserve failure causes, applicability conditions, and local discoveries across long horizons.',
+    t: 'Each experiment de-randomizes the next',
+    d: "Arbor's best candidates arrive mid-to-late, conditioned on accumulated evidence. The same compute buys a less repetitive, more constrained search — not a longer gamble on stumbling into a result.",
   },
   {
     n: '03',
-    t: 'Held-out merge gates',
-    d: 'Verified merges separate exploratory dev feedback from real artifact improvement.',
+    t: 'Ideas are evidence-conditioned, not guesses',
+    d: 'Each proposal is a local, executable move that answers an earlier failure — turning a half-right result into the next hypothesis instead of a reason to abandon the direction.',
   },
 ];
 
@@ -27,7 +27,13 @@ export default function WhyItMatters() {
           <Reveal>
             <div>
               <span className="kicker">Why It Matters</span>
-              <h2>Research state becomes a reusable asset.</h2>
+              <h2>Autonomous research that compounds.</h2>
+              <p className="lead">
+                Across Arbor's traces, what gets ruled out, validated, or shown to have
+                boundary conditions becomes a prior on the next proposal. The result is a
+                process that makes research cumulative — not more attempts, but less
+                repetitive, more memory-aware search.
+              </p>
             </div>
           </Reveal>
           <Reveal delay={0.1}>
