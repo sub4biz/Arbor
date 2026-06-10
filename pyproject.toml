@@ -21,6 +21,7 @@ dependencies = [
 [project.optional-dependencies]
 docs = [
     "mkdocs-material>=9.5",
+    "mkdocs-static-i18n>=1.2",
 ]
 
 [project.scripts]
