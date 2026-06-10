@@ -4,9 +4,16 @@ A plugin retargets Arbor to a **domain** without changing any code. It is a sing
 file that declares how to evaluate work, what must stay protected, what outputs are
 required, a compute budget, and some domain guidance for the agents.
 
-You only need a plugin when you run the **same kind of benchmark repeatedly** and want
-every run to use identical settings. For a one-off task you don't need one — just prepare a
-repo and launch `arbor` (see [Preparing a Benchmark](preparing-a-benchmark.md)).
+!!! abstract "Plugin vs. Skill in one line"
+    A **plugin** describes *what to optimize* — the eval rules, protected files, and budget
+    for a whole domain. A [Skill](skills.md) sharpens *how the agent reasons* at one step.
+    You can use either alone, or both together.
+
+!!! question "Do I even need a plugin?"
+    **No, not to start.** For a one-off task, just prepare a repo and launch `arbor` (see
+    [Preparing a Benchmark](preparing-a-benchmark.md)). Reach for a plugin only when you run
+    the **same kind of benchmark repeatedly** and want every run to use identical eval
+    rules, guardrails, and budget.
 
 ## Activating a plugin
 
@@ -24,6 +31,19 @@ arbor
 
 Arbor auto-discovers the config in the project directory; the intake chat then runs with
 the plugin's contract and guidance already applied.
+
+!!! tip "Try a plugin without editing files"
+    You can also pick a plugin from inside the intake chat — type `/` to use a slash
+    command:
+
+    ```text
+    /plugin load mle_kaggle mle_bench_lite   # load a plugin (and an optional profile)
+    /plugin unload                           # ignore the configured plugin this run
+    /plugin reset                            # go back to whatever your config specifies
+    ```
+
+    These choices apply to the single run you're about to launch and don't change your
+    config.
 
 ## The plugin format
 
@@ -126,13 +146,16 @@ A ready-to-edit config lives at `examples/kaggle_config.example.yaml` in the rep
 
 ## Writing your own plugin
 
-1. Copy `src/plugins/mle_kaggle.yaml` (or the minimal template above) and rename it.
+1. Create a `plugins/` folder inside your project and add `my_domain.yaml` there:
+   `<project>/plugins/my_domain.yaml`. Arbor discovers project plugins from this folder
+   (built-in plugins live alongside Arbor and are always available too). Start from the
+   minimal template above, or copy the bundled `mle_kaggle` plugin as a worked example.
 2. Set `name`, `description`, and the `eval_contract` for your domain.
 3. Add `protected_paths` / `required_outputs` if your task has data to guard or artifacts
    to produce.
 4. Add a `profiles` entry with your compute budget.
 5. Tune the agents with the injection points only if you need domain-specific behaviour.
 
-Reference the plugin by its `name` in a config, then launch `arbor`. Pair it with a
-[Skill](skills.md) when you want to shape *how* the agent reasons, not just what it
-optimizes.
+Then activate it by name — either `plugin: my_domain` in your config, or `/plugin load
+my_domain` in the chat — and launch `arbor`. Pair it with a [Skill](skills.md) when you want
+to shape *how* the agent reasons, not just what it optimizes.
