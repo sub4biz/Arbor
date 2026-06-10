@@ -107,7 +107,8 @@ instruction. The orchestrator owns phase loading from that point.
   minute-scale work, ask before running it.
 - In smoke mode, load `arbor-agent-tools` when native Arbor tools are absent,
   use cached metrics or `arbor_state.py parse-log`, generate
-  `prompt-executor --smoke`, then `check` and `report`.
+  `prompt-executor --smoke`, then run `check`, `report`, and a final
+  artifact-level `check`.
 - In real mode, still complete setup and contract confirmation before any long
   eval, training, package install, or merge.
 
@@ -154,6 +155,9 @@ Expected behavior:
 - keep B_test protected;
 - stop according to budget or smoke instruction;
 - report durable artifacts and caveats.
+- once `REPORT.md` and expected smoke artifacts exist, stop promptly with a
+  concise final response instead of continuing to polish reports or run extra
+  cycles.
 
 ## Hard Rules
 
@@ -168,3 +172,6 @@ Expected behavior:
   not a second coordinator implementation.
 - Do not spend wrapper context recreating setup, coordinator, or executor logic;
   once the contract is clear, load the orchestrator.
+- Do not continue running after the requested budget is complete and final
+  artifacts have been validated. Finalize with artifact paths, scores, and
+  caveats.

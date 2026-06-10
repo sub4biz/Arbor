@@ -31,6 +31,7 @@ Persist evaluation metadata early and update it after merges:
   `eval_retry_max_delay`.
 - `dataset_info`: paths and split descriptions.
 - `metric_direction`: `maximize` or `minimize`.
+- `trunk_branch`: non-protected branch that receives verified merges.
 - `submission_path`, `sample_submission_path`.
 
 Use `{cwd}` and `{node_id}` placeholders. Example:
@@ -55,7 +56,8 @@ cd {cwd} && uv run python run_eval.py --split dev --run-name {node_id}
 Native `GitMergeBranch`:
 
 1. Refuses target `main` or `master`.
-2. Resolves target to configured trunk branch.
+2. Resolves target to configured `trunk_branch`. `main`/`master` are base
+   branches, not merge targets.
 3. Creates an isolated worktree at `source_branch`.
 4. Runs `eval_cmd_test` with `{cwd}` and `{node_id}` substituted.
 5. Retries transient failures if configured.
@@ -95,7 +97,8 @@ if B_test fails.
 Before stopping:
 
 1. Ensure the best available branch is either merged or explicitly rejected.
-2. Run final B_test on trunk if available.
+2. Run final B_test on trunk only if it is available, contract-authorized, and
+   the run is not smoke-only.
 3. Record `test_trunk_score`.
 4. If `test_baseline_score` is missing and a baseline test run is feasible,
    record it.
@@ -114,8 +117,12 @@ If native `GitMergeBranch` is unavailable, use `arbor-agent-tools`:
 python <tools>/arbor_state.py eval --cwd <project> --run-name <run> \
   --split dev --cmd "<eval_cmd>" --set-meta baseline
 
+python <tools>/arbor_state.py meta --cwd <project> --run-name <run> \
+  --set "trunk_branch=<trunk_branch>"
+
 python <tools>/arbor_state.py merge --cwd <project> --run-name <run> \
-  --source-branch <branch> --target-branch <trunk> --node-id <id>
+  --source-branch <branch> --node-id <id>
 ```
 
+Pass `--target-branch <trunk_branch>` explicitly only when metadata is not set.
 If a manual merge would touch live work, prefer `--dry-run` first.

@@ -8,7 +8,7 @@ description: "Strict IDEATE-stage skill for Arbor/research_agent. Use immediatel
 Load this only during IDEATE. The coordinator must first call
 `TreeView(format="constraints")`.
 
-After loading, put this receipt in the reasoning trace:
+After loading, write a brief visible progress note if useful:
 
 ```text
 LOAD_RECEIPT: # SKILL: Idea Drafting

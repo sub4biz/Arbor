@@ -125,22 +125,34 @@ nodes before launching. Respect human review gates and cycle caps.
 
 If native `RunExecutor` is unavailable:
 
-1. Generate prompt:
+1. Create a worktree/branch or copy the repo if worktrees are unsafe.
+2. Generate the prompt from the main session while substituting the executor
+   worktree as `{cwd}`:
    ```bash
-   python <tools>/arbor_state.py prompt-executor --cwd <project> --run-name <run> --node-id <id>
+   python <tools>/arbor_state.py prompt-executor --cwd <project> --run-name <run> \
+     --node-id <id> --workdir <worktree> \
+     --output <project>/.arbor/sessions/<run>/experiments/<id>/executor_prompt.md
    ```
    For smoke/forward tests, add `--smoke` and include smoke-only additional
    context.
-2. Create a worktree/branch or copy the repo if worktrees are unsafe.
 3. Launch a fresh agent in that worktree with the generated prompt.
-4. Capture its report.
-5. Record outcome:
+4. Run B_dev from the worktree. With the fallback helper, keep session state
+   in `<project>` and run the command in `<worktree>`:
+   ```bash
+   python <tools>/arbor_state.py eval --cwd <project> --run-name <run> \
+     --split dev --exec-cwd <worktree> --cmd "<eval_cmd>" --node-id <id>
+   ```
+5. Capture the executor report. Before calling `record --report-file`, create
+   the referenced report file. If no file exists yet, pass the report body with
+   `--raw-report` instead.
+6. Record outcome:
    ```bash
    python <tools>/arbor_state.py record --cwd <project> --run-name <run> \
      --node-id <id> --score <score> --insight "<insight>" \
      --result "<result>" --code-ref <branch>
    ```
-6. Run `propagate` or manually update parent/root insights.
+7. Run `propagate` or manually update parent/root insights.
 
-For smoke/forward tests, skip steps 2-4: save the generated prompt under
+For smoke/forward tests, skip worktree creation, source edits, fresh agent
+launch, and B_dev execution. Save the generated prompt under
 `experiments/<node_id>/`, then use `record` with a cached or mocked report.

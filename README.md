@@ -25,13 +25,38 @@ hold up on held-out data. Instead of one-shot attempts that forget what failed, 
 grows a **hypothesis tree**: every idea becomes a branch — pruned if it fails,
 harvested if it works — and insights propagate back so later ideas start smarter.
 
-Arbor emphasizes two things: **generality** and **practicality**. It is general
-because it can work on any task with an optimization target and an optimization
-metric. It is practical because it ships as both a native CLI and an Agent Skill
-Suite, making it an agent you can actually run rather than only a research
-project. For more details, visit our [project page](https://RUC-NLPIR.github.io/Arbor/)
+For more details, visit our [project page](https://RUC-NLPIR.github.io/Arbor/)
 and read the [paper](assets/arbor_paper.pdf). For a more detailed usage manual,
 see our [documentation](https://RUC-NLPIR.github.io/Arbor/docs/).
+
+## 💡 Why Arbor
+
+* **General-purpose optimization** — Arbor can work on any task with an object
+  to improve and a metric to optimize, from benchmark agents to model pipelines
+  and experimental codebases.
+* **Practical agent runtime** — Arbor is not only a research prototype; it ships
+  with both a native CLI runtime and an Agent Skill Suite for Codex and Claude
+  Code, so you can use the full CLI for the strongest Arbor behavior or load the
+  skill suite inside another coding agent.
+* **Long-horizon structured exploration** — The hypothesis-tree framework lets
+  Arbor keep running as a cumulative search: results, failure modes, and
+  distilled insights persist in the Idea Tree and propagate upward, so later
+  ideas start smarter instead of being lost in a scrollback buffer.
+* **Real experiment discipline** — Executors iterate on a dev split, validate on
+  a held-out test split, and only merge gains that clear a configurable margin,
+  reducing overfitting to the metric being optimized.
+* **Isolated, reversible execution** — Every experiment runs in its own git
+  worktree on a dedicated branch, so your `main` branch is never touched until
+  you choose to merge.
+* **Built for long experiments** — Long-running training is first-class, with
+  generous timeouts, partial-metric recovery on timeout, and optional staged
+  budgets from smoke to pilot to full runs.
+* **Model and workflow flexibility** — Arbor supports Anthropic, OpenAI /
+  Responses API, and OpenAI-compatible backends through LiteLLM, including
+  DeepSeek, Gemini, Qwen, vLLM, Ollama, and local gateways.
+* **Steerable and adaptable** — A live terminal dashboard, read-only WebUI,
+  optional human-in-the-loop review, and one-line domain plugins let you steer
+  experiments without changing Arbor's core code.
 
 Arbor runs **two cooperating agents**:
 
@@ -40,16 +65,29 @@ Arbor runs **two cooperating agents**:
 - **Executor** — the research engineer. Given one idea, it faithfully implements the
   code changes, runs the experiment in an isolated git worktree, and reports evidence.
 
-<table>
-<tr><td><b>Cumulative hypothesis tree</b></td><td>Results, failure modes, and distilled insights persist in the Idea Tree and propagate back up — so later ideas start smarter instead of being lost in a scrollback buffer.</td></tr>
-<tr><td><b>Held-out discipline by default</b></td><td>Executors iterate on a dev split; only gains that clear a configurable margin on a held-out test split are merged. No overfitting to the metric you optimize.</td></tr>
-<tr><td><b>Isolated, reversible experiments</b></td><td>Every experiment runs in its own git worktree on a dedicated branch. Your <code>main</code> is never touched until you merge.</td></tr>
-<tr><td><b>Built for real experiments</b></td><td>Long-running training is first-class: generous timeouts, partial-metric recovery on timeout, and optional staged budgets (smoke → pilot → full).</td></tr>
-<tr><td><b>Use any model</b></td><td>Anthropic, OpenAI / Responses API, or anything OpenAI-compatible through LiteLLM (DeepSeek, Gemini, Qwen, vLLM, Ollama, local gateways).</td></tr>
-<tr><td><b>Steer &amp; adapt</b></td><td>A live terminal dashboard and read-only WebUI, optional human-in-the-loop at ideation/review, and one-line domain plugins — no code changes.</td></tr>
-</table>
+Together they repeat a six-step **arbor cycle**:
 
-## Demo
+1. **Observe** — the Coordinator re-grounds itself in the Idea Tree, reading the
+   active frontier, constraints, ancestor insights, recent evidence, and current
+   best artifact.
+2. **Ideate** — it chooses a parent node and proposes child hypotheses that refine,
+   correct, or extend what the tree has already learned.
+3. **Select** — it chooses the most promising pending leaves to test, balancing
+   the current best direction with unresolved alternatives.
+4. **Dispatch** — selected hypotheses are sent to independent Executors, which
+   implement them in fresh worktrees and evaluate them on the dev signal.
+5. **Backpropagate** — Arbor records each result, score, insight, and branch, then
+   abstracts the lesson upward so ancestor nodes and future ideas inherit it.
+6. **Decide** — the Coordinator chooses whether to merge, prune, continue, leave a
+   node pending, or stop, using held-out validation for merge decisions.
+
+## 🧩 Framework
+
+<p align="center">
+  <a href="assets/main_framework.pdf"><b>View the Arbor Framework Diagram (PDF)</b></a>
+</p>
+
+## 🎬 Demo
 
 
 https://github.com/user-attachments/assets/49c1a306-d2e9-49d6-9c83-65e38a62df30

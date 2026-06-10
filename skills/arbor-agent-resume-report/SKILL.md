@@ -77,6 +77,10 @@ In smoke/forward tests, finalization is still mandatory even when no real
 executor, merge, or B_test ran. Generate `REPORT.md`, make the smoke caveat
 explicit, and stop after artifact validation.
 
+After `REPORT.md` is written and expected artifacts validate, do not keep
+polishing reports or launching extra checks. Return a concise final response
+with paths, scores, and caveats.
+
 ## REPORT.md Contents
 
 Include:
@@ -110,8 +114,19 @@ python <tools>/arbor_state.py report --cwd <project> --run-name <run_name>
 ```
 
 For skill-suite smoke tests, run `python <tools>/arbor_state.py check` before
-`report` and verify the expected `.coordinator/idea_tree.json`,
-`.coordinator/idea_tree.md`, experiment artifact, and `REPORT.md` paths exist.
+`report` for tree integrity, then run it again after `report` with artifact
+flags:
+
+```bash
+python <tools>/arbor_state.py check --cwd <project> --run-name <run_name>
+python <tools>/arbor_state.py report --cwd <project> --run-name <run_name>
+python <tools>/arbor_state.py check --cwd <project> --run-name <run_name> \
+  --require-report --require-experiment --require-executor-prompt
+```
+
+Use `--strict-artifacts` only for full sessions that are expected to contain
+events and run stats in addition to tree, experiment, prompt, and report
+artifacts.
 
 ## Final Response To User
 

@@ -9,6 +9,7 @@ tools so Codex/Claude can forward-test the skill suite without native tools.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import fnmatch
 import hashlib
 import json
@@ -23,10 +24,16 @@ import time
 from pathlib import Path
 from typing import Any
 
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX fallback.
+    fcntl = None
+
 
 VERSION = 3
 STATUSES = {"pending", "running", "done", "merged", "pruned"}
 PROTECTED_BRANCHES = {"main", "master"}
+MUTATING_COMMANDS = {"init", "meta", "add", "update", "prune", "propagate", "eval", "record", "worktree", "merge"}
 
 DEFAULT_META: dict[str, Any] = {
     "baseline_score": None,
@@ -41,6 +48,7 @@ DEFAULT_META: dict[str, Any] = {
     "eval_retry_max_delay": None,
     "dataset_info": None,
     "metric_direction": "maximize",
+    "trunk_branch": None,
     "submission_path": None,
     "sample_submission_path": None,
 }
@@ -59,9 +67,23 @@ def tree_paths(cwd: str | Path, run_name: str) -> tuple[Path, Path]:
     return cdir / "idea_tree.json", cdir / "idea_tree.md"
 
 
+@contextlib.contextmanager
+def state_lock(cwd: str | Path, run_name: str):
+    lock_path = coordinator_dir(cwd, run_name) / ".state.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+", encoding="utf-8") as handle:
+        if fcntl is not None:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            if fcntl is not None:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
 def atomic_write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{time.time_ns()}.tmp")
     tmp.write_text(text, encoding="utf-8")
     tmp.replace(path)
 
@@ -624,9 +646,10 @@ def apply_eval_meta(tree: dict[str, Any], mode: str, score: float, cmd: str | No
 def cmd_eval(args: argparse.Namespace) -> None:
     tree = load_tree(args.cwd, args.run_name)
     node_id = args.node_id or ("TEST" if args.split == "test" else "DEV")
-    cmd = substitute(args.cmd, args.cwd, node_id)
+    exec_cwd = Path(args.exec_cwd or args.cwd).resolve()
+    cmd = substitute(args.cmd, exec_cwd, node_id)
     timeout = args.timeout or int(tree["meta"].get("eval_timeout") or 7200)
-    rc, output, timed_out = run_shell(cmd, args.cwd, timeout)
+    rc, output, timed_out = run_shell(cmd, exec_cwd, timeout)
     log_dir = coordinator_dir(args.cwd, args.run_name) / "eval_logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"{args.split}_{node_id}_{int(time.time())}.log"
@@ -641,6 +664,7 @@ def cmd_eval(args: argparse.Namespace) -> None:
         "score": score,
         "log_path": str(log_path),
         "command": cmd,
+        "exec_cwd": str(exec_cwd),
     }, indent=2))
     if rc != 0:
         raise SystemExit(rc)
@@ -756,7 +780,11 @@ def executor_prompt(
 def cmd_prompt_executor(args: argparse.Namespace) -> None:
     tree = load_tree(args.cwd, args.run_name)
     inferred_smoke = bool(args.additional_context and "SMOKE" in args.additional_context.upper())
-    print(executor_prompt(tree, args.cwd, args.node_id, args.additional_context, args.smoke or inferred_smoke))
+    prompt_cwd = Path(args.workdir or args.cwd).resolve()
+    prompt = executor_prompt(tree, prompt_cwd, args.node_id, args.additional_context, args.smoke or inferred_smoke)
+    output = Path(args.output) if args.output else session_dir(args.cwd, args.run_name) / "experiments" / args.node_id / "executor_prompt.md"
+    atomic_write(output, prompt + "\n")
+    print(prompt)
 
 
 def cmd_record(args: argparse.Namespace) -> None:
@@ -764,7 +792,13 @@ def cmd_record(args: argparse.Namespace) -> None:
     n = node(tree, args.node_id)
     raw = args.raw_report or ""
     if args.report_file:
-        raw = Path(args.report_file).read_text(encoding="utf-8")
+        report_path = Path(args.report_file)
+        if not report_path.exists():
+            raise SystemExit(
+                f"report file not found: {report_path}. "
+                "Create it first, or pass --raw-report instead."
+            )
+        raw = report_path.read_text(encoding="utf-8")
     score = args.score if args.score is not None else parse_score(raw)
     insight = args.insight or ""
     result = args.result or short(raw, 300)
@@ -846,9 +880,9 @@ def cmd_worktree(args: argparse.Namespace) -> None:
 
 def cmd_merge(args: argparse.Namespace) -> None:
     tree = load_tree(args.cwd, args.run_name)
-    target = args.target_branch
+    target = args.target_branch or tree["meta"].get("trunk_branch")
     if not target:
-        raise SystemExit("--target-branch is required when using the helper merge command")
+        raise SystemExit("--target-branch is required, or set metadata trunk_branch=<branch>")
     if target in PROTECTED_BRANCHES:
         raise SystemExit(f"refusing to merge into protected branch: {target}")
     src = args.source_branch
@@ -927,6 +961,7 @@ def cmd_merge(args: argparse.Namespace) -> None:
 
 def cmd_check(args: argparse.Namespace) -> None:
     tree = load_tree(args.cwd, args.run_name)
+    sdir = session_dir(args.cwd, args.run_name)
     errors: list[str] = []
     if tree.get("version") != VERSION:
         errors.append(f"version should be {VERSION}, got {tree.get('version')}")
@@ -944,6 +979,35 @@ def cmd_check(args: argparse.Namespace) -> None:
                 errors.append(f"{nid}: missing parent {parent}")
             elif nid not in tree["nodes"][parent].get("children_ids", []):
                 errors.append(f"{nid}: not listed in parent children")
+    required_files = [
+        (coordinator_dir(args.cwd, args.run_name) / "idea_tree.json", "missing idea_tree.json"),
+        (coordinator_dir(args.cwd, args.run_name) / "idea_tree.md", "missing idea_tree.md"),
+    ]
+    if args.require_report or args.strict_artifacts:
+        required_files.append((sdir / "REPORT.md", "missing REPORT.md"))
+    if args.require_events or args.strict_artifacts:
+        required_files.append((sdir / "events.jsonl", "missing events.jsonl"))
+    if args.require_run_stats or args.strict_artifacts:
+        required_files.append((sdir / "run_stats.json", "missing run_stats.json"))
+    for path, message in required_files:
+        if not path.exists():
+            errors.append(message)
+    if args.require_experiment or args.strict_artifacts:
+        exp_root = sdir / "experiments"
+        exp_dirs = sorted(p for p in exp_root.iterdir() if p.is_dir()) if exp_root.exists() else []
+        if not exp_dirs:
+            errors.append("missing experiment artifact directory")
+        for exp_dir in exp_dirs:
+            for name in ("report.md", "metrics.json"):
+                if not (exp_dir / name).exists():
+                    errors.append(f"{exp_dir.name}: missing {name}")
+            if (args.require_executor_prompt or args.strict_artifacts) and not (exp_dir / "executor_prompt.md").exists():
+                errors.append(f"{exp_dir.name}: missing executor_prompt.md")
+    elif args.require_executor_prompt:
+        exp_root = sdir / "experiments"
+        prompts = sorted(exp_root.glob("*/executor_prompt.md")) if exp_root.exists() else []
+        if not prompts:
+            errors.append("missing executor_prompt.md artifact")
     if errors:
         print("INVALID")
         for err in errors:
@@ -1064,6 +1128,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_common(sp)
     sp.add_argument("--split", choices=["dev", "test"], required=True)
     sp.add_argument("--cmd", required=True)
+    sp.add_argument("--exec-cwd", help="directory where the eval command runs; defaults to --cwd")
     sp.add_argument("--node-id")
     sp.add_argument("--timeout", type=int)
     sp.add_argument("--set-meta", choices=["none", "baseline", "trunk", "test_baseline", "test_trunk"], default="none")
@@ -1080,6 +1145,8 @@ def build_parser() -> argparse.ArgumentParser:
     add_common(sp)
     sp.add_argument("--node-id", required=True)
     sp.add_argument("--additional-context")
+    sp.add_argument("--workdir", help="working directory shown in the executor prompt; defaults to --cwd")
+    sp.add_argument("--output", help="path for executor_prompt.md; defaults under the session experiment directory")
     sp.add_argument("--smoke", action="store_true", help="emit smoke-only executor instructions")
     sp.set_defaults(func=cmd_prompt_executor)
 
@@ -1106,7 +1173,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("merge")
     add_common(sp)
     sp.add_argument("--source-branch", required=True)
-    sp.add_argument("--target-branch", required=True)
+    sp.add_argument("--target-branch")
     sp.add_argument("--node-id", required=True)
     sp.add_argument("--test-score", type=float)
     sp.add_argument("--timeout", type=int)
@@ -1118,6 +1185,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser("check")
     add_common(sp)
+    sp.add_argument("--require-report", action="store_true")
+    sp.add_argument("--require-experiment", action="store_true")
+    sp.add_argument("--require-executor-prompt", action="store_true")
+    sp.add_argument("--require-events", action="store_true")
+    sp.add_argument("--require-run-stats", action="store_true")
+    sp.add_argument("--strict-artifacts", action="store_true")
     sp.set_defaults(func=cmd_check)
 
     sp = sub.add_parser("report")
@@ -1130,7 +1203,11 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    args.func(args)
+    if getattr(args, "cmd", None) in MUTATING_COMMANDS:
+        with state_lock(args.cwd, args.run_name):
+            args.func(args)
+    else:
+        args.func(args)
     return 0
 
 

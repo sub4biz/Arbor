@@ -24,11 +24,30 @@
 **假设树**：每个想法都是一根分支，失败就剪枝，成功就收获；洞见会沿树反向传播，让后续想法
 站在更聪明的起点上。
 
-Arbor 特别强调两个特点：**通用**和**实用**。通用，是因为只要一个任务有明确的优化对象和优化指标，
-Arbor 就可以胜任；实用，是因为 Arbor 同时提供原生 CLI 和 Agent Skill Suite 两个版本，不停留在
-research project 阶段，而是一个真正可以运行起来的 agent。更多详细内容欢迎查看我们的
-[项目主页](https://RUC-NLPIR.github.io/Arbor/)和[论文](assets/arbor_paper.pdf)。更详细的使用手册
-请参见我们的[文档](https://RUC-NLPIR.github.io/Arbor/docs/)。
+更多详细内容欢迎查看我们的[项目主页](https://RUC-NLPIR.github.io/Arbor/)和
+[论文](assets/arbor_paper.pdf)。更详细的使用手册请参见我们的
+[文档](https://RUC-NLPIR.github.io/Arbor/docs/)。
+
+## 💡 为什么选择 Arbor
+
+* **通用优化能力** —— 只要任务有明确的优化对象和优化指标，Arbor 就可以胜任，无论是
+  benchmark agent、模型流水线，还是实验型代码库。
+* **真正可用的智能体** —— Arbor 不只是研究原型；它同时提供原生 CLI runtime 和面向
+  Codex / Claude Code 的 Agent Skill Suite；需要最完整能力时可以使用 CLI，希望在其他
+  coding agent 中复刻 Arbor-style 研究行为时可以加载 skill suite。
+* **面向长程任务的结构化探索** —— 假设树让 Arbor 可以连续运行很久，把探索变成可累积的
+  搜索过程：结果、失败模式和提炼出的洞见都会保存在 Idea Tree 中并向上反向传播，让后续
+  想法站在更聪明的起点上，而不是淹没在滚动日志里。
+* **面向真实实验的纪律** —— Executor 在 dev 划分上迭代，在 held-out test 划分上验证，
+  只有超过可配置阈值的收益才会被合并，从而减少对正在优化的指标过拟合。
+* **隔离且可回退的执行** —— 每个实验都在自己的 git worktree 和独立分支上运行；在你主动
+  合并之前，`main` 分支不会被触碰。
+* **为长实验而设计** —— 长时间训练是 Arbor 的核心能力之一，包括宽裕的超时设置、超时后的
+  部分指标恢复，以及从 smoke、pilot 到 full run 的可选分阶段预算。
+* **灵活的模型和工作流支持** —— Arbor 支持 Anthropic、OpenAI / Responses API，以及通过
+  LiteLLM 接入的 OpenAI 兼容后端，包括 DeepSeek、Gemini、Qwen、vLLM、Ollama 和本地网关。
+* **易于引导和适配** —— 实时终端仪表盘、只读 WebUI、构思/审阅阶段可选的人在回路，以及
+  一行即可切换的领域插件，让你无需修改 Arbor 核心代码也能引导实验。
 
 Arbor 由**两个协作智能体**组成：
 
@@ -37,16 +56,28 @@ Arbor 由**两个协作智能体**组成：
 - **Executor（执行者）** —— 科研工程师。给定一个想法后，它会忠实实现代码改动，在隔离的 git worktree 中
   运行实验，并汇报证据。
 
-<table>
-<tr><td><b>持续累积的假设树</b></td><td>结果、失败模式和提炼出的洞见都会保存在想法树中，并向上反向传播，让后续想法站在更聪明的起点上，而不是淹没在滚动日志里。</td></tr>
-<tr><td><b>默认遵守留出纪律</b></td><td>Executor 在 dev 划分上迭代；只有在留出 test 划分上跨过可配置阈值的改进才会被合并，避免对正在优化的指标过拟合。</td></tr>
-<tr><td><b>隔离且可回退的实验</b></td><td>每个实验都在自己的 git worktree 和独立分支上运行。在你主动合并之前，<code>main</code> 绝不会被触碰。</td></tr>
-<tr><td><b>面向真实实验设计</b></td><td>长时间训练被作为核心能力支持：宽裕的超时设置、超时后的部分指标恢复，以及可选的分阶段预算（smoke → pilot → full）。</td></tr>
-<tr><td><b>支持任意模型</b></td><td>Anthropic、OpenAI / Responses API，或任何通过 LiteLLM 接入的 OpenAI 兼容后端（DeepSeek、Gemini、Qwen、vLLM、Ollama、本地网关）。</td></tr>
-<tr><td><b>易于引导和适配</b></td><td>实时终端仪表盘、只读 WebUI、构思/审阅阶段可选的人在回路，以及一行即可切换的领域插件，无需改代码。</td></tr>
-</table>
+二者共同重复一个六步 **Arbor 循环（arbor cycle）**：
 
-## 演示
+1. **观察（Observe）** —— Coordinator 重新读取 Idea Tree 中的当前状态，包括活跃前沿、
+   约束、祖先洞见、近期证据和当前最优 artifact。
+2. **构思（Ideate）** —— 它选择一个父节点，并提出若干子假设，用来细化、修正或延展树中
+   已经学到的内容。
+3. **选择（Select）** —— 它从 pending 叶子节点中选出最值得验证的方向，在利用当前最优路线
+   与探索尚未解决的替代方向之间取得平衡。
+4. **派发（Dispatch）** —— 被选中的假设会交给独立的 Executor；Executor 在新的 worktree 中
+   实现该想法，并基于 dev 信号进行评估。
+5. **反向传播（Backpropagate）** —— Arbor 记录每次实验的结果、分数、洞见和分支引用，并把
+   抽象后的经验上推到祖先节点，让后续想法继承。
+6. **决策（Decide）** —— Coordinator 决定合并、剪枝、继续、保持 pending 或停止；涉及合并时，
+   使用 held-out 验证作为准入依据。
+
+## 🧩 框架图
+
+<p align="center">
+  <a href="assets/main_framework.pdf"><b>查看 Arbor 框架图（PDF）</b></a>
+</p>
+
+## 🎬 演示
 
 https://github.com/user-attachments/assets/49c1a306-d2e9-49d6-9c83-65e38a62df30
 

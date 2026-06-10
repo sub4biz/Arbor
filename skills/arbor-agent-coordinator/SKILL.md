@@ -28,7 +28,8 @@ Run once at the start unless resuming.
 3. Run or locate the unmodified baseline on B_dev.
 4. Persist metadata with `TreeSetMeta`:
    `baseline_score`, `trunk_score`, `eval_cmd`, `eval_cmd_test`,
-   `dataset_info`, `metric_direction`, and any timeout/retry settings.
+   `dataset_info`, `metric_direction`, `trunk_branch`, and any
+   timeout/retry settings.
 5. If a plugin supplies an `eval_contract`, prefill the matching metadata.
 
 If resuming, skip INIT and call `TreeView` to re-orient.
@@ -85,8 +86,9 @@ Use `arbor-agent-merge-eval` for merge decisions.
 - Prune: repeated failures with no credible recovery path.
 - Stop: cap/budget reached, diminishing returns, or no pending ideas.
 
-Before stopping, run final B_test if available and record
-`test_trunk_score`.
+Before stopping, run final B_test only if it is available, the contract permits
+it, and the run is not smoke-only. Record `test_trunk_score` when the final
+test run is valid.
 
 ## Idea Tree Schema
 
@@ -117,6 +119,7 @@ Tree metadata stores:
 - `eval_timeout`, `eval_retries`, retry backoff
 - `dataset_info`
 - `metric_direction`
+- `trunk_branch`
 - `submission_path`, `sample_submission_path`
 
 ## Tool Mapping
@@ -137,6 +140,10 @@ Native Arbor tools:
 
 If these are not available, load `arbor-agent-tools` and use
 `scripts/arbor_state.py` as the state backend.
+
+When using the fallback helper, serialize tree-mutating commands for the same
+run. Do not launch `meta`, `add`, `update`, `prune`, `propagate`, `eval`,
+`record`, `worktree`, or `merge` in parallel.
 
 ## Cycle Caps
 

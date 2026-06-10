@@ -441,34 +441,26 @@ PY
 Validate a smoke session:
 
 ```bash
-python skills/arbor-agent-tools/scripts/arbor_state.py check --cwd <target_repo> --run-name <run_name>
+python skills/arbor-agent-tools/scripts/arbor_state.py check --cwd <target_repo> --run-name <run_name> \
+  --require-report --require-experiment --require-executor-prompt
 ```
 
-## Verified Evidence
+## Verified Behavior
 
-The detailed extraction and validation report is:
-
-```text
-../open_source_research_agent_skill_report.md
-```
-
-The wrapper smoke test was run in:
-
-```text
-/tmp/arbor-wrapper-smoke-Slyxbe
-```
-
-Verified results:
+The suite has been validated with both static checks and a dynamic Codex smoke
+run in a disposable target repository outside the Arbor checkout. A reproducible
+validation should confirm:
 
 - All 11 skills pass `quick_validate.py`.
 - All 11 `agents/openai.yaml` files parse correctly.
 - `arbor_state.py` compiles.
-- `arbor_state.py check` returns `OK` for the wrapper smoke run.
-- A new Codex session starting only from `arbor-research-agent` successfully
-  performed intake, loaded the orchestrator and phase skills, and generated
-  Arbor-style artifacts.
-- The smoke run did not execute `uv sync`, `prepare.py`, `train.py`, GPU
-  training, downloads, full evals, worktrees, merges, or source edits.
+- `arbor_state.py check` returns `OK` with the expected artifact flags.
+- A fresh Codex session starting only from `$arbor-research-agent` performs
+  intake, loads the orchestrator and phase skills, maintains an Idea Tree,
+  dispatches through executor-style behavior, and writes Arbor-style artifacts.
+- Smoke runs do not execute package syncs, training scripts, GPU training,
+  downloads, full evals, worktrees, merges, or source edits unless the user
+  explicitly requested a real run.
 
 ## Troubleshooting
 
@@ -939,33 +931,24 @@ PY
 校验 smoke session：
 
 ```bash
-python skills/arbor-agent-tools/scripts/arbor_state.py check --cwd <target_repo> --run-name <run_name>
+python skills/arbor-agent-tools/scripts/arbor_state.py check --cwd <target_repo> --run-name <run_name> \
+  --require-report --require-experiment --require-executor-prompt
 ```
 
-## 已验证证据
+## 已验证行为
 
-详细抽取和验证报告：
-
-```text
-../open_source_research_agent_skill_report.md
-```
-
-Wrapper smoke test 路径：
-
-```text
-/tmp/arbor-wrapper-smoke-Slyxbe
-```
-
-已验证结果：
+这套 suite 已经过静态检查和动态 Codex smoke run 验证；动态验证应在 Arbor checkout
+之外的临时目标仓库中进行。一次可复现的验证应确认：
 
 - 11 个 skill 全部通过 `quick_validate.py`。
 - 11 个 `agents/openai.yaml` 都可解析。
 - `arbor_state.py` 可编译。
-- wrapper smoke run 的 `arbor_state.py check` 返回 `OK`。
-- 新 Codex 只从 `arbor-research-agent` 入口启动时，能成功完成 intake、加载
-  orchestrator 和阶段 skill，并生成 Arbor-style artifacts。
-- Smoke run 没有执行 `uv sync`、`prepare.py`、`train.py`、GPU training、
-  downloads、full evals、worktrees、merges 或 source edits。
+- `arbor_state.py check` 在带上预期 artifact flags 时返回 `OK`。
+- 新 Codex 只从 `$arbor-research-agent` 入口启动时，能完成 intake，加载
+  orchestrator 和各阶段 skill，维护 Idea Tree，通过 executor-style 行为派发，并生成
+  Arbor-style artifacts。
+- 除非用户明确要求真实运行，smoke run 不会执行 package sync、训练脚本、GPU
+  training、downloads、full evals、worktrees、merges 或 source edits。
 
 ## 常见问题
 

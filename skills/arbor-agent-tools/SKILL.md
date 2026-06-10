@@ -20,17 +20,21 @@ script stores state in the same style as open-source Arbor:
 Common commands:
 
 ```bash
-python scripts/arbor_state.py init --cwd <project> --run-name <run> --task "<contract>"
-python scripts/arbor_state.py view --cwd <project> --run-name <run> --format constraints
-python scripts/arbor_state.py meta --cwd <project> --run-name <run> --set baseline_score=42 --set trunk_score=42
-python scripts/arbor_state.py add --cwd <project> --run-name <run> --parent-id ROOT --hypothesis "<four-line hypothesis>"
-python scripts/arbor_state.py update --cwd <project> --run-name <run> --node-id 1 --status done --score 45 --insight "..."
-python scripts/arbor_state.py prompt-executor --cwd <project> --run-name <run> --node-id 1
-python scripts/arbor_state.py prompt-executor --cwd <project> --run-name <run> --node-id 1 --smoke
-python scripts/arbor_state.py record --cwd <project> --run-name <run> --node-id 1 --score 45 --insight "..." --result "..."
-python scripts/arbor_state.py eval --cwd <project> --run-name <run> --split dev --cmd "bash {cwd}/eval.sh" --set-meta baseline
-python scripts/arbor_state.py parse-log --log <project>/run.log --metric val_bpb
-python scripts/arbor_state.py report --cwd <project> --run-name <run>
+TOOLS="<skill-dir>/arbor-agent-tools/scripts/arbor_state.py"
+python "$TOOLS" init --cwd <project> --run-name <run> --task "<contract>"
+python "$TOOLS" view --cwd <project> --run-name <run> --format constraints
+python "$TOOLS" meta --cwd <project> --run-name <run> --set baseline_score=42 --set trunk_score=42
+python "$TOOLS" meta --cwd <project> --run-name <run> --set "eval_cmd=cd {cwd} && bash eval.sh"
+python "$TOOLS" add --cwd <project> --run-name <run> --parent-id ROOT --hypothesis "<four-line hypothesis>"
+python "$TOOLS" update --cwd <project> --run-name <run> --node-id 1 --status done --score 45 --insight "..."
+python "$TOOLS" worktree --cwd <project> --run-name <run> --node-id 1 --trunk <trunk_branch>
+python "$TOOLS" prompt-executor --cwd <project> --run-name <run> --node-id 1 --workdir <worktree>
+python "$TOOLS" prompt-executor --cwd <project> --run-name <run> --node-id 1 --smoke
+python "$TOOLS" eval --cwd <project> --run-name <run> --split dev --exec-cwd <worktree> --cmd "bash {cwd}/eval.sh" --set-meta trunk
+python "$TOOLS" record --cwd <project> --run-name <run> --node-id 1 --score 45 --insight "..." --result "..."
+python "$TOOLS" parse-log --log <project>/run.log --metric val_bpb
+python "$TOOLS" report --cwd <project> --run-name <run>
+python "$TOOLS" check --cwd <project> --run-name <run> --require-report --require-experiment --require-executor-prompt
 ```
 
 Read `references/tool-mapping.md` when deciding which script command maps to a
@@ -43,13 +47,20 @@ native Arbor tool.
 - Do not run B_test during executor iteration.
 - Use `record` for executor outcomes so artifacts and tree updates stay in
   one place.
-- Use `check` before trusting a hand-edited tree.
+- Use `check` before trusting a hand-edited tree. Add artifact flags such as
+  `--require-report`, `--require-experiment`, `--require-executor-prompt`,
+  `--require-events`, `--require-run-stats`, or `--strict-artifacts` when
+  validating a completed run.
+- Serialize tree-mutating commands for the same run. Do not parallelize
+  `init`, `meta`, `add`, `update`, `prune`, `propagate`, `eval`, `record`,
+  `worktree`, or `merge`.
 
 ## Forward Testing
 
-For a smoke test, copy the target project to `/tmp`, initialize a short run,
-record metadata, add one idea, generate an executor prompt, and run only cheap
-commands. Do not run full long training unless explicitly requested.
+For a smoke test, copy the target project to a disposable directory outside the
+Arbor repository, initialize a short run, record metadata, add one idea,
+generate an executor prompt, and run only cheap commands. Do not run full long
+training unless explicitly requested.
 
 Smoke-specific rules:
 

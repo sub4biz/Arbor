@@ -22,6 +22,9 @@ contract plus a clean workspace/session ready for the Arbor cycle.
 6. Propose one complete contract and ask for a single yes/edit confirmation.
 7. Initialize or select `.arbor/sessions/<run_name>/` and hand the contract
    to the coordinator.
+8. If real merges are allowed, define a non-protected `trunk_branch` such as
+   `arbor/trunk/<run_name>`. Treat `main`/`master` as the base branch, not the
+   merge target.
 
 For smoke/forward tests, never run expensive setup, data prep, training, GPU
 jobs, or the discovered full eval command. Locate an existing score in cached
@@ -88,7 +91,8 @@ Use the open-source layout:
 When no native Arbor runtime exists, initialize the same layout with:
 
 ```bash
-python /path/to/arbor-agent-tools/scripts/arbor_state.py init \
+TOOLS="<skill-dir>/arbor-agent-tools/scripts/arbor_state.py"
+python "$TOOLS" init \
   --cwd <project> --run-name <run_name> --task "<contract>"
 ```
 
@@ -125,6 +129,7 @@ The setup phase can discover metadata, but the coordinator must persist it:
 - `eval_retries`
 - `dataset_info`
 - `metric_direction`
+- `trunk_branch`
 - `submission_path`
 - `sample_submission_path`
 
@@ -135,6 +140,15 @@ cd {cwd} && <eval command> --run-name {node_id}
 ```
 
 Never bake the main checkout path into executor commands.
+
+When using `arbor_state.py meta`, quote any `--set` value that contains
+spaces, braces, shell metacharacters, or JSON:
+
+```bash
+python "$TOOLS" meta --cwd <project> --run-name <run_name> \
+  --set "eval_cmd=cd {cwd} && python eval.py --split dev" \
+  --set "trunk_branch=arbor/trunk/<run_name>"
+```
 
 In smoke mode, if a cached baseline log exists, parse only metric lines with
 `arbor_state.py parse-log` or an equivalent parser that normalizes carriage

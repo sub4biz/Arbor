@@ -80,13 +80,16 @@ runtime or checking Codex/Claude Code portability.
 - Maintain an Idea Tree as durable memory. Do not rely on transient chat
   reasoning for run state.
 - Record `baseline_score`, `trunk_score`, `eval_cmd`, `eval_cmd_test`,
-  `dataset_info`, and `metric_direction` as metadata before dispatching real
-  executors.
+  `dataset_info`, `metric_direction`, and `trunk_branch` as metadata before
+  dispatching real executors.
 - Use B_dev for iteration. Use B_test only for merge verification and final
-  reporting.
+  reporting when the contract permits B_test and the run is not smoke-only.
 - Use eval command templates with `{cwd}` and `{node_id}`. Do not hardcode the
   main repository path inside executor eval commands.
 - Keep main/master protected. Merge only into the configured trunk branch.
+- If using `arbor_state.py`, run tree-mutating commands serially. Do not
+  parallelize `init`, `meta`, `add`, `update`, `prune`, `propagate`, `eval`,
+  `record`, `worktree`, or `merge` against the same run.
 - Preserve evidence: experiment reports, metrics, diffs, event logs, tree JSON,
   tree Markdown, run stats, and final report.
 - If the real `arbor` CLI is installed and the user wants a real run, prefer
@@ -109,6 +112,7 @@ executor prompt, raw reports, and final summary.
   Use `arbor_state.py parse-log` or normalize with `tr '\r' '\n'` before
   matching; only inspect at most 20 log lines when debugging a failure.
 - Generate executor prompts with `arbor_state.py prompt-executor --smoke`.
+  Save the generated prompt as `experiments/<node_id>/executor_prompt.md`.
 - Do not create real worktrees, edit source, or merge branches unless the user
   explicitly wants a real run.
 - Still complete the durable Arbor artifacts: tree JSON/Markdown, experiment
@@ -129,8 +133,9 @@ Use this skeleton when no native `arbor` runtime is available:
    - Load `arbor-agent-executor`; dispatch one or more executors.
    - Load `arbor-agent-search` for validated winners when useful.
    - Load `arbor-agent-merge-eval`; merge, prune, or continue.
-4. Load `arbor-agent-resume-report`; run final B_test if available, write
-   `REPORT.md`, and summarize artifact paths.
+4. Load `arbor-agent-resume-report`; run final B_test only if it is available,
+   authorized, and the run is not smoke-only; write `REPORT.md`; summarize
+   artifact paths.
 
 ## Common Failure Corrections
 
