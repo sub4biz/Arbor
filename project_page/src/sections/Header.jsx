@@ -44,6 +44,7 @@ export default function Header() {
             {n.label}
           </a>
         ))}
+        <a href="docs/">Docs</a>
       </nav>
       <a className="header-cta" href="https://github.com/RUC-NLPIR/Arbor" target="_blank" rel="noreferrer">
         <span>Star on</span> GitHub
