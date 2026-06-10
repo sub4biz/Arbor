@@ -2,12 +2,11 @@
   <img src="assets/hero.svg" alt="Arbor — Optimize anything" width="100%">
 </p>
 
-<p align="center">
-  <em>面向通用自主科研的假设树精炼方法（Toward Generalist Autonomous Research via Hypothesis-Tree Refinement）</em>
-</p>
+
+# 基于假设树的面向通用自主科研方法（Toward Generalist Autonomous Research via Hypothesis-Tree Refinement）
+
 
 <p align="center">
-  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.10+"></a>
   <a href="assets/arbor_paper.pdf"><img src="https://img.shields.io/badge/Paper-PDF-B31B1B?style=for-the-badge" alt="Paper"></a>
   <a href="https://github.com/RUC-NLPIR/Arbor"><img src="https://img.shields.io/badge/Code-GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub"></a>
   <a href="https://RUC-NLPIR.github.io/Arbor/"><img src="https://img.shields.io/badge/Project_Page-Live-0E9B9B?style=for-the-badge&logo=githubpages&logoColor=white" alt="Project Page"></a>
