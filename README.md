@@ -213,6 +213,7 @@ Each cycle runs six steps:
 ⑥ DECIDE    continue / merge into trunk / prune / stop
 ```
 
+
 ### The Idea Tree
 
 ```
