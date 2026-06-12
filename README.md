@@ -336,6 +336,7 @@ On **MLE-Bench Lite** with GPT-5.5, Arbor reaches **86.36% Any-Medal** (100% val
 submissions, 95.45% above median, 77.27% gold). See the [paper](https://arxiv.org/pdf/2606.11926)
 for full protocols and ablations.
 
+
 ---
 
 ## 🗂️ Project Structure
