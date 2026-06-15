@@ -127,6 +127,14 @@ class LLMConfig(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True, validate_assignment=True)
 
+    # Friendly aliases accepted inside the ``llm:`` YAML block. The top-level
+    # ``timeout:`` block is a *different* model (TimeoutConfig), so users
+    # naturally write ``llm.timeout`` expecting the request timeout — accept it
+    # as a synonym for ``llm_timeout`` instead of silently dropping it. The
+    # warning machinery in ``config_resolve`` reads this same registry so the
+    # alias is not flagged as an unknown key.
+    FIELD_ALIASES: ClassVar[dict[str, str]] = {"timeout": "llm_timeout"}
+
     # Backend selector (single axis). "auto" routes by model name:
     #   claude* (no custom base_url) → native Anthropic (prompt caching)
     #   everything else             → litellm (DeepSeek/Gemini/Qwen/proxies)
@@ -156,6 +164,23 @@ class LLMConfig(BaseModel):
         if isinstance(value, str) and value.lower() == "none":
             return None
         return value
+
+    @model_validator(mode="before")
+    @classmethod
+    def _apply_field_aliases(cls, data: Any) -> Any:
+        """Map friendly aliases (e.g. ``timeout`` → ``llm_timeout``) onto their
+        real field before validation. The explicit field always wins if both are
+        present; the alias key is consumed so it never trips extra-key handling."""
+        if not isinstance(data, dict):
+            return data
+        patched = data
+        for alias, real in cls.FIELD_ALIASES.items():
+            if alias in patched:
+                if patched is data:  # copy lazily, never mutate the caller's dict
+                    patched = dict(data)
+                value = patched.pop(alias)
+                patched.setdefault(real, value)
+        return patched
 
     @model_validator(mode="after")
     def _default_model_for_provider(self) -> "LLMConfig":

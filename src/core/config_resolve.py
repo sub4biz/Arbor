@@ -98,7 +98,7 @@ def _warn_unknown_nested_blocks(mapping: dict[str, Any], *, location: str) -> No
     from .config_schema import ContextConfig, LLMConfig, TimeoutConfig, UIConfig
 
     block_fields: dict[str, set[str]] = {
-        "llm": set(LLMConfig.model_fields),
+        "llm": set(LLMConfig.model_fields) | set(LLMConfig.FIELD_ALIASES),
         "timeout": set(TimeoutConfig.model_fields),
         "context": set(ContextConfig.model_fields),
         "ui": set(UIConfig.model_fields),
