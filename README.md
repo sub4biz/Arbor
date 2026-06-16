@@ -125,16 +125,27 @@ runtime skills stored under `src/skills/`.
 **Requirements:** Python ≥ 3.10 and Git. A virtual environment is recommended.
 
 ```bash
+pip install arbor-agent   # or: uv pip install arbor-agent
+arbor doctor              # verify PATH, git, API keys
+```
+
+> Prefer a global command? `pipx install arbor-agent` makes `arbor` available everywhere.
+
+<details>
+<summary>Install from source (for development)</summary>
+
+```bash
 git clone https://github.com/RUC-NLPIR/Arbor.git
 cd Arbor
 python -m venv .venv && source .venv/bin/activate   # recommended
 pip install -e .                                    # or: uv pip install -e .
-arbor doctor                                        # verify PATH, git, API keys
+arbor doctor
 ```
 
-> Prefer a global command? `pipx install -e .` makes `arbor` available everywhere.
-> For the docs site, `pip install -e ".[docs]" && mkdocs serve`, or read them online
-> via the **Docs** badge above.
+For the docs site, `pip install -e ".[docs]" && mkdocs serve`, or read them online
+via the **Docs** badge above.
+
+</details>
 
 ---
 

@@ -20,7 +20,7 @@ propagate back up the tree so later ideas start smarter.
 
 -   :material-rocket-launch: **Get running in minutes**
 
-    Clone, `pip install -e .`, `arbor setup`, then `arbor`.
+    `pip install arbor-agent`, `arbor setup`, then `arbor`.
 
     [:octicons-arrow-right-24: Installation](installation.md)
 

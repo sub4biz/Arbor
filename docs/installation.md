@@ -10,9 +10,7 @@
 ## Install
 
 ```bash
-git clone https://github.com/RUC-NLPIR/Arbor.git
-cd Arbor
-pip install -e .          # or: uv pip install -e .
+pip install arbor-agent          # or: uv pip install arbor-agent
 ```
 
 That single command installs Arbor and the `arbor` command into your current Python
@@ -23,7 +21,7 @@ environment. We recommend a virtual environment so it stays isolated:
     ```bash
     python -m venv .venv
     source .venv/bin/activate        # Windows: .venv\Scripts\activate
-    pip install -e .
+    pip install arbor-agent
     ```
 
 === "uv"
@@ -31,12 +29,25 @@ environment. We recommend a virtual environment so it stays isolated:
     ```bash
     uv venv
     source .venv/bin/activate
-    uv pip install -e .
+    uv pip install arbor-agent
     ```
 
+!!! tip "Upgrading"
+    Pull the latest release with `pip install -U arbor-agent`.
+
+## Install from source (development)
+
+To hack on Arbor itself, install it editable from a clone:
+
+```bash
+git clone https://github.com/RUC-NLPIR/Arbor.git
+cd Arbor
+pip install -e .          # or: uv pip install -e .
+```
+
 !!! info "Why editable (`-e`)?"
-    Arbor is research software under active development. An editable install lets you
-    pull updates with `git pull` without reinstalling.
+    An editable install lets you pull updates with `git pull` without reinstalling —
+    ideal when you're modifying Arbor's own source.
 
 ## Verify
 
@@ -56,8 +67,8 @@ install it with [pipx](https://pipx.pypa.io) — it manages the isolated environ
 you:
 
 ```bash
-pipx install -e .                 # run from the cloned Arbor directory
-pipx reinstall arbor     # upgrade later
+pipx install arbor-agent          # install globally
+pipx upgrade arbor-agent          # upgrade later
 ```
 
 ## Troubleshooting

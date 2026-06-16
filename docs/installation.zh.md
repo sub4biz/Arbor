@@ -10,9 +10,7 @@
 ## 安装
 
 ```bash
-git clone https://github.com/RUC-NLPIR/Arbor.git
-cd Arbor
-pip install -e .          # 或：uv pip install -e .
+pip install arbor-agent          # 或：uv pip install arbor-agent
 ```
 
 这一条命令就会把 Arbor 及 `arbor` 命令装进你当前的 Python 环境。我们建议用虚拟环境保持隔离：
@@ -22,7 +20,7 @@ pip install -e .          # 或：uv pip install -e .
     ```bash
     python -m venv .venv
     source .venv/bin/activate        # Windows：.venv\Scripts\activate
-    pip install -e .
+    pip install arbor-agent
     ```
 
 === "uv"
@@ -30,11 +28,24 @@ pip install -e .          # 或：uv pip install -e .
     ```bash
     uv venv
     source .venv/bin/activate
-    uv pip install -e .
+    uv pip install arbor-agent
     ```
 
+!!! tip "升级"
+    用 `pip install -U arbor-agent` 获取最新发布版本。
+
+## 从源码安装（开发用）
+
+若要修改 Arbor 本身的源码，从克隆仓库做可编辑安装：
+
+```bash
+git clone https://github.com/RUC-NLPIR/Arbor.git
+cd Arbor
+pip install -e .          # 或：uv pip install -e .
+```
+
 !!! info "为什么用可编辑安装（`-e`）？"
-    Arbor 是活跃开发中的研究软件。可编辑安装让你通过 `git pull` 获取更新，而无需重新安装。
+    可编辑安装让你通过 `git pull` 获取更新，而无需重新安装——适合在你修改 Arbor 自身源码时使用。
 
 ## 验证
 
@@ -52,8 +63,8 @@ Python 上、`git` 是否可用，以及用户配置是否存在。
 [pipx](https://pipx.pypa.io) 安装——它会替你管理隔离环境：
 
 ```bash
-pipx install -e .                 # 在克隆下来的 Arbor 目录中执行
-pipx reinstall arbor     # 之后升级
+pipx install arbor-agent          # 全局安装
+pipx upgrade arbor-agent          # 之后升级
 ```
 
 ## 故障排查

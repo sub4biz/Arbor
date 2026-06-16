@@ -79,14 +79,26 @@ https://github.com/user-attachments/assets/49c1a306-d2e9-49d6-9c83-65e38a62df30
 **环境要求：** Python ≥ 3.10 及 Git。推荐使用虚拟环境。
 
 ```bash
+pip install arbor-agent   # 或使用：uv pip install arbor-agent
+arbor doctor              # 验证 PATH、git 及 API 密钥
+```
+
+> 想要全局命令？使用 `pipx install arbor-agent` 可将 `arbor` 命令安装至全局环境。
+
+<details>
+<summary>从源码安装（用于开发）</summary>
+
+```bash
 git clone https://github.com/RUC-NLPIR/Arbor.git
 cd Arbor
 python -m venv .venv && source .venv/bin/activate   # 推荐
 pip install -e .                                    # 或使用：uv pip install -e .
-arbor doctor                                        # 验证 PATH、git 及 API 密钥
+arbor doctor
 ```
 
-> 想要全局命令？使用 `pipx install -e .` 可将 `arbor` 命令安装至全局环境。 若需本地查看文档站点，运行 `pip install -e ".[docs]" && mkdocs serve`，或通过上方的 **Docs** 徽章在线阅读。
+若需本地查看文档站点，运行 `pip install -e ".[docs]" && mkdocs serve`，或通过上方的 **Docs** 徽章在线阅读。
+
+</details>
 
 ------
 

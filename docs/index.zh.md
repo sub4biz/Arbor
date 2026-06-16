@@ -18,7 +18,7 @@ hide:
 
 -   :material-rocket-launch: **几分钟内跑起来**
 
-    克隆、`pip install -e .`、`arbor setup`，然后 `arbor`。
+    `pip install arbor-agent`、`arbor setup`，然后 `arbor`。
 
     [:octicons-arrow-right-24: 安装](installation.md)
 
