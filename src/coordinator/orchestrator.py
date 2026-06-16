@@ -46,6 +46,27 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
+def _resume_pending_user_note(pending_user: dict[str, Any] | None) -> str:
+    """Resume-prompt section reminding the agent it was paused awaiting a human
+    answer, if it was (mirrors the checkpoint's ``pending_user`` / AWAIT_USER
+    payload). Empty string when nothing was pending.
+    """
+    if not pending_user:
+        return ""
+    question = str(pending_user.get("prompt") or "").strip()
+    if not question:
+        return ""
+    node_id = str(pending_user.get("node_id") or "").strip()
+    scope = f" (about node {node_id})" if node_id else ""
+    return (
+        "## Pending question to the user\n\n"
+        f"When the run was interrupted you were waiting for the user's answer{scope} to:\n"
+        f"> {question}\n\n"
+        "Their answer was not received. If you still need it, ask again with "
+        "AskUser before proceeding; otherwise continue."
+    )
+
+
 def _git_output(cwd: str, *args: str) -> str | None:
     """Return git command output, or None when cwd is not a usable git repo."""
     try:
@@ -539,6 +560,17 @@ class CoordinatorOrchestrator:
         # system prefix hash is recorded in the checkpoint.
         self._system_hash = hashlib.sha256(system_prompt.encode("utf-8")).hexdigest()
 
+        # On resume, if the coordinator's system prefix changed since the
+        # checkpoint (different model/plugin/config), the provider's KV cache is
+        # cold — note it so a slower, costlier first turn isn't a surprise.
+        if self._resume_checkpoint is not None:
+            prior_hash = self._resume_checkpoint.cache.stable_system_hash
+            if prior_hash and prior_hash != self._system_hash:
+                _print_status(
+                    "  Note: coordinator system prompt changed since the checkpoint "
+                    "— prompt cache will be cold for the first resumed turn."
+                )
+
         # Share the coordinator config's llm/timeout/context subgroups; override only
         # the coordinator's own model (effective_meta_model) and runtime knobs.
         agent_config = AgentConfig(
@@ -633,6 +665,9 @@ class CoordinatorOrchestrator:
             "Call TreeView to refresh your view, then continue the iterative "
             "research loop from where you left off."
         )
+        pending_note = _resume_pending_user_note(self._pending_user)
+        if pending_note:
+            parts.append(pending_note)
         parts.extend(self._eval_info_parts("Evaluation Info (from previous session)"))
         return "\n\n".join(parts)
 
@@ -770,6 +805,15 @@ class CoordinatorOrchestrator:
                     f"({type(exc).__name__}) — resuming without it"
                 )
                 self._resume_checkpoint = None
+
+            # Restore a suspended human-in-the-loop question so the resumed run
+            # knows it was paused mid-question (surfaced in the resume prompt).
+            if self._resume_checkpoint is not None:
+                self._pending_user = self._resume_checkpoint.pending_user
+                if self._pending_user:
+                    _print_status(
+                        "  Restored a pending user question from the checkpoint"
+                    )
             return
 
         if json_path.exists():
