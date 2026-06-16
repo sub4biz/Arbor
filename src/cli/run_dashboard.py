@@ -66,7 +66,6 @@ try:
         BufferControl, Float, FloatContainer, FormattedTextControl, HSplit, Window,
     )
     from prompt_toolkit.layout import Layout as PTLayout
-    from prompt_toolkit.layout.dimension import Dimension
     from prompt_toolkit.layout.menus import CompletionsMenu
     from prompt_toolkit.patch_stdout import patch_stdout
     from prompt_toolkit.styles import Style

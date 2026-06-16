@@ -14,10 +14,9 @@ import json
 import logging
 import os
 import subprocess
-import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..core import Agent, AgentConfig
 from ..core.llm.base import LLMProvider
@@ -39,6 +38,9 @@ from .prompts import build_coordinator_system_prompt
 from .tools import get_coordinator_tools
 from .tools.executor_run import _compute_branch_name, _completed_cycles
 from .tools.tree_ops import TreeAddNodeTool
+
+if TYPE_CHECKING:
+    from ..events import EventBus, NullBus
 
 log = logging.getLogger(__name__)
 

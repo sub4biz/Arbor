@@ -20,7 +20,7 @@ from ..core.config_schema import (
 )
 
 if TYPE_CHECKING:
-    from ..plugins.base import Plugin
+    from ..core.config import AgentConfig
 
 from .convergence import ConvergenceConfig
 

@@ -16,7 +16,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-from .idea_tree import IdeaTree, Node
+from .idea_tree import IdeaTree
 
 log = logging.getLogger(__name__)
 

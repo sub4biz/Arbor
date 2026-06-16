@@ -184,7 +184,7 @@ def _draw_frontier(grid, scored, metric_direction, plot_w, x_to_col, y_to_row) -
         if cur is not None:
             frontier_row[c] = y_to_row(cur)
 
-    prev_c = prev_r = None
+    prev_r = None
     for c in range(first_col, plot_w):
         if c not in frontier_row:
             continue
@@ -204,7 +204,7 @@ def _draw_frontier(grid, scored, metric_direction, plot_w, x_to_col, y_to_row) -
             else:                               # regressed frontier (rare)
                 _set_frontier(grid, prev_r, c, "╮")
                 _set_frontier(grid, r, c, "╰")
-        prev_c, prev_r = c, r
+        prev_r = r
 
 
 def _set_frontier(grid, r, c, glyph) -> None:

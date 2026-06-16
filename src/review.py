@@ -152,13 +152,13 @@ def show_summary(run_dir: Path) -> None:
                 scored_nodes.append(node)
 
         if status_counts:
-            print(f"\n  Nodes by status:")
+            print("\n  Nodes by status:")
             for st, cnt in sorted(status_counts.items()):
                 print(f"    {st}: {cnt}")
 
         if scored_nodes:
             scored_nodes.sort(key=lambda n: n.get("score", 0), reverse=True)
-            print(f"\n  Top results:")
+            print("\n  Top results:")
             for n in scored_nodes[:5]:
                 print(f"    {n['id']}: {n.get('hypothesis', '?')[:60]}")
                 print(f"         score={n['score']:.1f}%, status={n['status']}")
@@ -169,7 +169,7 @@ def show_summary(run_dir: Path) -> None:
     if report_path.exists():
         report = report_path.read_text().strip()
         if report:
-            print(f"\n  Final Report:")
+            print("\n  Final Report:")
             for line in report.split("\n")[-20:]:
                 print(f"    {line}")
 
@@ -179,7 +179,7 @@ def show_summary(run_dir: Path) -> None:
         print(f"\n  Dashboard available: {dashboard_path}")
         print(f"  Open with: review-research --cwd <cwd> {run_dir.name} dashboard")
 
-    print(f"\n  Files:")
+    print("\n  Files:")
     for f in sorted(run_dir.iterdir()):
         if f.is_file():
             print(f"    {f.name:<30} {_fmt_size(f.stat().st_size):>10}")

@@ -245,8 +245,6 @@ def _build_tree_html(nodes: dict, root_id: str, meta: dict) -> str:
 
         badge = f'<span class="status-badge" style="background:{color}">{_esc(status)}</span>'
 
-        has_children = bool(children)
-        toggle = "tree-toggle" if has_children else "tree-leaf"
         expanded = "open" if depth < 2 else ""
 
         detail_parts: list[str] = []

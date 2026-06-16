@@ -77,6 +77,43 @@ packages = [
 ]
 
 [tool.setuptools.package-data]
-"arbor" = ["skills/*.md"]
+"arbor" = ["skills/*.md", "py.typed"]
 "arbor.webui" = ["index.html"]
 "arbor.plugins" = ["*.yaml", "*.yml"]
+
+# ── Dev tooling ──────────────────────────────────────────────────────
+# Install with: `uv sync --group dev`  (or `pip install -e ".[dev]"` is NOT
+# enough — these live in a dependency group, use uv or `pip install <names>`).
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "mypy>=1.10",
+    "types-PyYAML",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Tests map the `arbor` package onto `src/` themselves, so no install is needed.
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py310"
+# Match the existing codebase: long lines are common and intentional, so we
+# keep ruff's default rule set (pyflakes `F` + a subset of pycodestyle `E`)
+# rather than enabling line-length or import-sorting churn.
+extend-exclude = ["project_page", "site", "assets"]
+
+[tool.ruff.lint.per-file-ignores]
+# run_dashboard.py is a compact TUI key dispatcher that deliberately uses
+# `action(); return` one-liners throughout — respect that local idiom.
+"src/cli/run_dashboard.py" = ["E702"]
+
+[tool.mypy]
+# Advisory only for now: the codebase is large and largely untyped, so mypy
+# runs non-blocking in CI. Tighten these as type coverage grows.
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = false
+warn_redundant_casts = true
+exclude = ["project_page", "site", "tests"]
