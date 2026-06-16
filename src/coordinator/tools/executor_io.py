@@ -173,7 +173,7 @@ def _build_executor_prompt(
 
 def _build_resume_context(
     config: "CoordinatorConfig", node: "Node", attempt: int
-) -> str | None:
+) -> str:
     """Assemble context for a resumed attempt from the prior attempt's artifacts.
 
     The executor worktree is gone, but its branch (``node.code_ref``) is checked
