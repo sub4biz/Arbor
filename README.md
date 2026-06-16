@@ -208,6 +208,27 @@ executor:
 A copy-pasteable example with every option lives in
 [`examples/research_config.example.yaml`](examples/research_config.example.yaml).
 
+### Try the runnable example task
+
+If you just want to watch Arbor work end-to-end — **no API budget, no GPU** —
+[`examples/algotune_knn/`](examples/algotune_knn) is a tiny, self-contained
+benchmark modeled on [AlgoTune](https://algotune.io/). The task is to make a
+brute-force k-nearest-neighbours solver **faster** while producing the **same**
+output; the metric is the speedup over a reference implementation. It is pure
+NumPy, CPU-only, sub-second, and deterministic, with several genuine
+optimizations for the Idea Tree to discover.
+
+```bash
+cp -r examples/algotune_knn /tmp/algotune_knn   # run outside the Arbor checkout
+cd /tmp/algotune_knn
+git init -q && git add -A && git commit -qm baseline
+arbor
+```
+
+In one 6-cycle run this drove the dev speedup from **1.01x → 7.77x** (held-out
+test **1.00x → 7.22x**). See [`examples/algotune_knn/README.md`](examples/algotune_knn/README.md)
+for the research contract and tuning knobs.
+
 ---
 
 ## 🧠 How It Works

@@ -155,6 +155,24 @@ executor:
 
 包含所有选项的完整示例配置文件位于 [`examples/research_config.example.yaml`](https://claude.ai/chat/examples/research_config.example.yaml)。
 
+### 试用可运行的示例任务
+
+如果你只想完整地看一遍 Arbor 是怎么工作的——**不耗 API 预算、不需要 GPU**——
+[`examples/algotune_knn/`](examples/algotune_knn) 是一个仿照 [AlgoTune](https://algotune.io/)
+的迷你基准。任务是让一个暴力 k 近邻求解器在**输出完全相同**的前提下**跑得更快**，
+指标是相对参考实现的加速比。它纯 NumPy、仅用 CPU、亚秒级、且完全确定性，并留有多个
+真实可达的优化点供想法树去发现。
+
+```bash
+cp -r examples/algotune_knn /tmp/algotune_knn   # 在 Arbor 仓库之外运行
+cd /tmp/algotune_knn
+git init -q && git add -A && git commit -qm baseline
+arbor
+```
+
+在一次 6 轮的运行中，它把开发集加速比从 **1.01x 提升到 7.77x**（留出测试集 **1.00x → 7.22x**）。
+研究契约与可调参数详见 [`examples/algotune_knn/README.md`](examples/algotune_knn/README.md)。
+
 ------
 
 ## 🧠 工作原理
