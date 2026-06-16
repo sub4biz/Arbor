@@ -36,8 +36,9 @@ from .context_prune import prune_ideate_context
 from .idea_tree import IdeaTree, Node
 from .prompts import build_coordinator_system_prompt
 from .tools import get_coordinator_tools
-from .tools.executor_run import _compute_branch_name, _completed_cycles
+from .tools.executor_run import _completed_cycles
 from .tools.tree_ops import TreeAddNodeTool
+from .tools.worktree import _compute_branch_name
 
 if TYPE_CHECKING:
     from ..events import EventBus, NullBus
