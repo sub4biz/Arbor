@@ -27,7 +27,7 @@
 
 更多详情，请访问我们的[项目主页](https://ruc-nlpir.github.io/Arbor/)并阅读[论文](https://arxiv.org/pdf/2606.11926)。如需详细的使用说明，请参阅[文档](https://ruc-nlpir.github.io/Arbor/docs/)。🧭 你也可以根据自己的环境和工作流选择使用 [CLI 版本或技能套件版本](https://claude.ai/chat/e7121091-ce2c-4970-a60f-16b54c453729#-cli-与技能套件版本)。
 
-## � 最新动态
+## 📣 最新动态
 
 - **2026-06** — Arbor 被美国知名科技媒体 [VentureBeat](https://venturebeat.com/) 报道：[《New AI optimization framework beats Claude Code and Codex by 2.5x on the same compute budget》](https://venturebeat.com/orchestration/new-ai-optimization-framework-beats-claude-code-and-codex-by-2-5x-on-the-same-compute-budget)。📰
 - **2026-06** — Arbor 原生 CLI 运行时与智能体技能套件（Codex / Claude Code）正式发布。🚀
