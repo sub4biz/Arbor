@@ -117,6 +117,9 @@ class PreflightChecker:
     }
 
     def _check_llm(self) -> CheckResult:
+        if self.provider == "openai-oauth":
+            return self._check_openai_oauth()
+
         if self.provider not in self._PROVIDER_ENV:
             return CheckResult(
                 "llm", "fail",
@@ -154,6 +157,27 @@ class PreflightChecker:
             f"missing {expected} for provider={self.provider}",
             hint=f"export {primary}=... or run `arbor setup`",
         )
+
+    @staticmethod
+    def _check_openai_oauth() -> CheckResult:
+        """ChatGPT subscription auth lives in a token file, not an env var."""
+        try:
+            from ..core.oauth import openai as oauth
+        except ImportError:
+            return CheckResult(
+                "llm", "fail", "openai oauth support unavailable",
+                hint="reinstall arbor",
+            )
+        tokens = oauth.load_tokens()
+        if tokens is None:
+            return CheckResult(
+                "llm", "fail",
+                "not logged in to ChatGPT (provider=openai-oauth)",
+                hint="run `arbor login openai`",
+            )
+        plan = tokens.plan_type or "unknown"
+        return CheckResult("llm", "pass",
+                           f"ChatGPT subscription token found (plan={plan})")
 
     # ── Check 2: codebase ──────────────────────────────────────────
 

@@ -48,6 +48,7 @@ def run_setup_wizard(*, force: bool = False) -> bool:
         "                   API and uses it when available, else chat completions\n"
         "  [bold]openai-responses[/bold] OpenAI / o-series via the Responses API (reasoning chain)\n"
         "  [bold]openai-chat[/bold]      any OpenAI-compatible endpoint (DeepSeek / Qwen / GLM / …)\n"
+        "  [bold]openai-oauth[/bold]     ChatGPT Plus/Pro subscription via browser login (experimental)\n"
         "  [bold]anthropic[/bold]        Claude via the native Anthropic API[/]"
     )
     provider = _prompt_choice(
@@ -55,6 +56,9 @@ def run_setup_wizard(*, force: bool = False) -> bool:
         choices=list(PROVIDER_CHOICES),
         default="auto",
     )
+
+    if provider == "openai-oauth":
+        return _setup_openai_oauth()
 
     # 2. base_url (local proxy / vLLM / official API)
     base_url = typer.prompt(
@@ -90,6 +94,36 @@ def run_setup_wizard(*, force: bool = False) -> bool:
         "([dim]view it anytime with[/] [bold]arbor config show[/])."
     )
     _console.print("Just run [bold]arbor[/] to start a session.\n")
+    return True
+
+
+def _setup_openai_oauth() -> bool:
+    """Run the ChatGPT subscription login, then write the global config."""
+    from ...core.oauth import openai as oauth
+    from .._constants import DEFAULT_OPENAI_OAUTH_MODEL
+    from ..style import console as _console
+
+    _console.print()
+    _console.print(
+        "[yellow]Experimental:[/] using a ChatGPT subscription token with "
+        "third-party tools may violate OpenAI's terms and risks your account."
+    )
+    try:
+        tokens = oauth.login()
+    except oauth.OAuthError as exc:
+        _console.print(f"[red]login failed:[/] {exc}")
+        return False
+
+    plan = tokens.plan_type or "unknown"
+    _console.print(f"[green]✓[/] signed in to ChatGPT — plan=[bold]{plan}[/]")
+
+    model = typer.prompt("Model", default=DEFAULT_OPENAI_OAUTH_MODEL).strip() or DEFAULT_OPENAI_OAUTH_MODEL
+    _console.print()
+    write_user_llm_config({"provider": "openai-oauth", "model": model})
+    _console.print(
+        f"\n[green]Done.[/] Saved to [bold]{GLOBAL_CONFIG_FILE}[/]. "
+        "Just run [bold]arbor[/] to start a session.\n"
+    )
     return True
 
 
