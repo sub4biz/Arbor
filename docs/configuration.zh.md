@@ -143,6 +143,23 @@ arbor config init --provider litellm --model qwen-72b \
     优先用环境变量（`${ANTHROPIC_API_KEY}`），而非把密钥粘进文件。`arbor setup` 会把你的全局 key
     连同其余配置一起存在 `~/.arbor/` 下。
 
+!!! warning "实验性：用 ChatGPT 订阅登录（`openai-oauth`）"
+    ChatGPT Plus/Pro/Team 订阅用户可以用月费订阅来跑 Arbor，而不必用按量计费的 API key。
+    运行 `arbor login openai` 通过浏览器登录；token 存在 `~/.arbor/oauth/openai.json` 并自动刷新。
+    它会写入：
+
+    ```yaml
+    llm:
+      provider: openai-oauth
+      model: gpt-5
+    ```
+
+    用 `arbor login status` / `arbor login logout` 管理会话。请求发往 ChatGPT 后端
+    （`chatgpt.com/backend-api/codex`），**不是** `api.openai.com`。
+
+    用订阅 token 接第三方工具可能违反 OpenAI 条款，并有被限流或封号的风险。此路径为可选、
+    不受支持——正式用途请优先使用标准的 `OPENAI_API_KEY`。
+
 ### 3. 按项目：一个配置文件 { #3-per-project-a-config-file }
 
 当一个项目需要它自己的持久设置时，往里放一个 YAML 文件。Arbor 会自动检测目标目录里的

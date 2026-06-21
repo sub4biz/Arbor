@@ -155,6 +155,24 @@ three:
     Prefer an environment variable (`${ANTHROPIC_API_KEY}`) over pasting a secret into a
     file. `arbor setup` stores your global key under `~/.arbor/` with the rest of the config.
 
+!!! warning "Experimental: ChatGPT subscription login (`openai-oauth`)"
+    ChatGPT Plus/Pro/Team subscribers can drive Arbor with their subscription instead of a
+    pay-per-token key. Run `arbor login openai` to sign in through the browser; the token is
+    stored in `~/.arbor/oauth/openai.json` and refreshed automatically. This writes:
+
+    ```yaml
+    llm:
+      provider: openai-oauth
+      model: gpt-5
+    ```
+
+    Manage the session with `arbor login status` / `arbor login logout`. Requests go to the
+    ChatGPT backend (`chatgpt.com/backend-api/codex`), **not** `api.openai.com`.
+
+    Using a subscription token with third-party tooling may violate OpenAI's terms and can
+    get your account rate-limited or banned. This path is opt-in and unsupported — prefer a
+    standard `OPENAI_API_KEY` for anything you care about.
+
 ### 3. Per-project: a config file
 
 When a project needs its own durable settings, drop a YAML file in it. Arbor auto-detects
