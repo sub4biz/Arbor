@@ -23,13 +23,16 @@ def web_command(
     session: str = typer.Argument(
         ..., help="Session name or path (under .arbor/sessions/), e.g. the run name."
     ),
-    cwd: Path = typer.Option(Path.cwd, "--cwd", help="Project directory holding .arbor/sessions/."),
+    cwd: Path | None = typer.Option(
+        None, "--cwd", help="Project directory holding .arbor/sessions/ (default: current directory)."
+    ),
     port: int = typer.Option(8765, "--port", help="Preferred port (rolls forward if busy)."),
     open_browser: bool = typer.Option(True, "--open/--no-open", help="Open the URL in a browser."),
 ) -> None:
     """Serve a read-only web monitor for an Arbor session and block until Ctrl-C."""
+    base = Path(cwd) if cwd is not None else Path.cwd()
     try:
-        session_dir = resolve_session_dir(Path(session), Path(cwd))
+        session_dir = resolve_session_dir(Path(session), base)
     except ExportError as exc:
         typer.secho(f"error: {exc}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1) from exc

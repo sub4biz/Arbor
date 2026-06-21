@@ -36,6 +36,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import time
@@ -368,7 +369,10 @@ def eval_run(
     # re-running, and so the score is auditable.
     log_dir = coordinator_dir(cwd, run_name) / "eval_logs"
     log_dir.mkdir(parents=True, exist_ok=True)
-    log_path = log_dir / f"{split}_{node_label}_{int(time.time())}.log"
+    # Sanitize the node label before using it as a filename component so a value
+    # like "../x" cannot write the log outside eval_logs/.
+    safe_label = re.sub(r"[^A-Za-z0-9_.-]+", "-", node_label) or "node"
+    log_path = log_dir / f"{split}_{safe_label}_{int(time.time())}.log"
     log_path.write_text(output, encoding="utf-8")
 
     score = parse_score(output)
@@ -419,7 +423,11 @@ def worktree_create(
 
     wt = _worktree_base("worktrees") / branch.replace("/", "__").replace(".", "_")
     if wt.exists():
+        # `git worktree remove` only handles registered worktrees; rmtree also
+        # clears an orphaned directory so the subsequent `worktree add` (which
+        # refuses a non-empty path) succeeds on a retry.
         git(cwd, "worktree", "remove", "--force", str(wt))
+        shutil.rmtree(wt, ignore_errors=True)
     start = trunk or "HEAD"
     rc, out = git(cwd, "worktree", "add", "-b", branch, str(wt), start)
     if rc != 0:
@@ -432,6 +440,8 @@ def worktree_create(
 def worktree_remove(cwd: str | Path, worktree: str | Path) -> dict[str, Any]:
     """Force-remove a previously created experiment worktree."""
     rc, out = git(cwd, "worktree", "remove", "--force", str(worktree))
+    # Clear any leftover directory git did not remove (e.g. an orphaned path).
+    shutil.rmtree(Path(worktree), ignore_errors=True)
     return {"removed": str(worktree), "returncode": rc, "output": out}
 
 
@@ -484,6 +494,7 @@ def git_merge_branch(
         wt = _worktree_base("merge-eval") / source_branch.replace("/", "__").replace(".", "_")
         if wt.exists():
             git(cwd, "worktree", "remove", "--force", str(wt))
+            shutil.rmtree(wt, ignore_errors=True)
         rc, out = git(cwd, "worktree", "add", "--detach", str(wt), source_branch)
         if rc != 0:
             raise RuntimeError(f"could not create B_test eval worktree: {out}")
@@ -495,6 +506,7 @@ def git_merge_branch(
                 raise ValueError("B_test evaluation failed or score missing:\n" + output[-2000:])
         finally:
             git(cwd, "worktree", "remove", "--force", str(wt))
+            shutil.rmtree(wt, ignore_errors=True)
 
     if test_score is None:
         raise ValueError("no test score available; set meta.eval_cmd_test or pass test_score")
@@ -509,12 +521,17 @@ def git_merge_branch(
     # ── Guard 4: protected paths must be untouched ───────────────────────────
     if protected_paths:
         rc, diff = git(cwd, "diff", "--name-only", f"{target}...{source_branch}")
-        if rc == 0:
-            files = [ln.strip() for ln in diff.splitlines() if ln.strip()]
-            for pattern in protected_paths:
-                for path in files:
-                    if fnmatch.fnmatch(path, pattern):
-                        raise ValueError(f"merge rejected: protected path {path} matches {pattern}")
+        # Fail closed: if we cannot compute the changed files, we cannot prove
+        # the protected paths are untouched, so refuse rather than merge blindly.
+        if rc != 0:
+            raise RuntimeError(
+                f"could not diff {target}...{source_branch} for the protected-path check:\n{diff}"
+            )
+        files = [ln.strip() for ln in diff.splitlines() if ln.strip()]
+        for pattern in protected_paths:
+            for path in files:
+                if fnmatch.fnmatch(path, pattern):
+                    raise ValueError(f"merge rejected: protected path {path} matches {pattern}")
 
     # ── Guard 5: required outputs must exist on the source branch ────────────
     for output_path in required_outputs or []:

@@ -163,6 +163,18 @@ def test_merge_rejects_protected_path(tmp_path: Path) -> None:
         )
 
 
+def test_merge_protected_path_check_fails_closed_on_bad_diff(tmp_path: Path) -> None:
+    # If the changed-file diff can't be computed (e.g. an unknown source branch),
+    # the protected-path guard must refuse the merge rather than silently skip it.
+    repo = _init_repo(tmp_path)
+    ops.tree_add_node(repo, "r", "ROOT", "idea")
+    with pytest.raises(RuntimeError, match="protected-path check"):
+        ops.git_merge_branch(
+            repo, "r", "1", "exp/does-not-exist", target_branch="trunk",
+            test_score=1.0, protected_paths=["model.py"],
+        )
+
+
 def test_merge_rejects_missing_required_output(tmp_path: Path) -> None:
     repo = _init_repo(tmp_path)
     _make_branch(repo, "exp/x", content="v = 2\n")
