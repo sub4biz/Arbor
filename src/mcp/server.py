@@ -35,6 +35,7 @@ TOOL_NAMES = (
     "worktree_remove",
     "git_merge_branch",
     "generate_report",
+    "open_dashboard",
 )
 
 # Human-readable hint shown when the optional SDK is missing.
@@ -185,6 +186,17 @@ def build_server() -> Any:
     def generate_report(run_name: str, instruction: str | None = None, cwd: str | None = None) -> dict[str, Any]:
         """Render REPORT.md for the session from its durable artifacts."""
         return ops.generate_session_report(_cwd(cwd), run_name, instruction=instruction)
+
+    # ── Dashboard ────────────────────────────────────────────────────────────
+
+    @server.tool()
+    def open_dashboard(run_name: str, port: int = 8765, cwd: str | None = None) -> dict[str, Any]:
+        """Open a read-only web monitor for the session; returns its URL.
+
+        Surface the returned URL to the user so they can watch the Idea Tree grow
+        in the browser as you work. Safe to call more than once.
+        """
+        return ops.open_dashboard(_cwd(cwd), run_name, port=port)
 
     return server
 

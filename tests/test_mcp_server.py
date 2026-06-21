@@ -24,7 +24,7 @@ def test_tool_names_surface_is_stable() -> None:
     assert set(srv.TOOL_NAMES) == {
         "tree_view", "tree_add_node", "tree_update_node", "tree_prune",
         "tree_set_meta", "eval_run", "worktree_create", "worktree_remove",
-        "git_merge_branch", "generate_report",
+        "git_merge_branch", "generate_report", "open_dashboard",
     }
 
 

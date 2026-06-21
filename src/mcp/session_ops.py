@@ -558,3 +558,34 @@ def generate_session_report(cwd: str | Path, run_name: str, *, instruction: str 
     """Render ``REPORT.md`` for the session via the real report generator."""
     out = generate_report(session_dir(cwd, run_name), instruction=instruction)
     return {"report_path": str(out)}
+
+
+# ── Dashboard ─────────────────────────────────────────────────────────────────
+
+# Keep references to dashboards started in-process (e.g. from the long-lived MCP
+# server) so repeated calls return the existing URL instead of leaking servers.
+_DASHBOARDS: dict[str, Any] = {}
+
+
+def open_dashboard(cwd: str | Path, run_name: str, *, port: int = 8765) -> dict[str, Any]:
+    """Start (or reuse) a read-only web monitor for the session; return its URL.
+
+    The monitor is file-backed: it polls the session directory, so it reflects
+    whatever the host agent writes via the tree tools. Safe to call repeatedly —
+    a single dashboard per session is kept alive for the life of the process.
+    The WebUI import is local so the (stdlib-only) HTTP server is loaded lazily
+    and never affects the keyless import guarantee.
+    """
+    sdir = session_dir(cwd, run_name)
+    key = str(sdir)
+    existing = _DASHBOARDS.get(key)
+    if existing is not None:
+        return {"url": existing.url, "session_dir": key, "reused": True}
+
+    from ..webui.launcher import start_session_webui
+
+    server = start_session_webui(sdir, run_name=run_name, preferred=port)
+    if server is None:
+        raise RuntimeError("could not bind a port for the web monitor")
+    _DASHBOARDS[key] = server
+    return {"url": server.url, "session_dir": key, "reused": False}
