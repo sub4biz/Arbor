@@ -8,6 +8,7 @@ writer (:func:`write_user_llm_config`) so both produce the same file shape.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import typer
@@ -15,7 +16,6 @@ import typer
 from ..._app import GLOBAL_CONFIG_FILE
 from .._constants import (
     DEFAULT_CLAUDE_MODEL,
-    PROVIDER_CHOICES,
     default_model_for_provider,
 )
 from .config_cmd import write_user_llm_config
@@ -42,18 +42,15 @@ def run_setup_wizard(*, force: bool = False) -> bool:
                    f"{GLOBAL_CONFIG_FILE}.[/]\n")
 
     # 1. API type / provider
-    _console.print(
-        "[dim]API type:\n"
-        "  [bold]auto[/bold]             let Arbor detect it — probes the endpoint's Responses\n"
-        "                   API and uses it when available, else chat completions\n"
-        "  [bold]openai-responses[/bold] OpenAI / o-series via the Responses API (reasoning chain)\n"
-        "  [bold]openai-chat[/bold]      any OpenAI-compatible endpoint (DeepSeek / Qwen / GLM / …)\n"
-        "  [bold]openai-oauth[/bold]     ChatGPT Plus/Pro subscription via browser login (experimental)\n"
-        "  [bold]anthropic[/bold]        Claude via the native Anthropic API[/]"
-    )
-    provider = _prompt_choice(
+    provider = _select_choice(
         "API type",
-        choices=list(PROVIDER_CHOICES),
+        options=[
+            ("auto", "let Arbor detect it — probes Responses API, else chat completions"),
+            ("openai-responses", "OpenAI / o-series via the Responses API (reasoning chain)"),
+            ("openai-chat", "any OpenAI-compatible endpoint (DeepSeek / Qwen / GLM / …)"),
+            ("openai-oauth", "ChatGPT Plus/Pro subscription via browser login (experimental)"),
+            ("anthropic", "Claude via the native Anthropic API"),
+        ],
         default="auto",
     )
 
@@ -144,6 +141,100 @@ def _probe_credentials(provider: str, api_key: str | None) -> None:
             _console.print(f"  [dim]{result.hint}[/]")
     else:
         _console.print("[green]✓[/] credentials look resolvable")
+
+
+def _select_choice(
+    label: str, *, options: list[tuple[str, str]], default: str
+) -> str:
+    """Pick one value with arrow keys (↑/↓ or k/j, Enter to confirm).
+
+    ``options`` is a list of ``(value, description)`` pairs. Falls back to a
+    typed prompt when stdin/stdout is not an interactive terminal (CI, pipes,
+    test runners) or when prompt_toolkit cannot start.
+    """
+    values = [value for value, _ in options]
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return _prompt_choice(label, choices=values, default=default)
+
+    try:
+        return _arrow_select(label, options=options, default=default)
+    except Exception:
+        # Terminal can't host a full prompt_toolkit app — degrade gracefully.
+        return _prompt_choice(label, choices=values, default=default)
+
+
+def _arrow_select(
+    label: str, *, options: list[tuple[str, str]], default: str
+) -> str:
+    from prompt_toolkit.application import Application
+    from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.layout import Layout
+    from prompt_toolkit.layout.containers import HSplit, Window
+    from prompt_toolkit.layout.controls import FormattedTextControl
+    from prompt_toolkit.styles import Style
+
+    values = [value for value, _ in options]
+    width = max(len(value) for value in values)
+    index = values.index(default) if default in values else 0
+    state = {"index": index}
+
+    def render() -> list[tuple[str, str]]:
+        lines: list[tuple[str, str]] = []
+        for i, (value, desc) in enumerate(options):
+            selected = i == state["index"]
+            pointer = "❯ " if selected else "  "
+            style = "class:option.selected" if selected else "class:option"
+            meta = "class:meta.selected" if selected else "class:meta"
+            lines.append((style, f"{pointer}{value:<{width}}"))
+            lines.append((meta, f"   {desc}\n"))
+        return lines
+
+    kb = KeyBindings()
+
+    @kb.add("up")
+    @kb.add("k")
+    def _(event):  # noqa: ANN001
+        state["index"] = (state["index"] - 1) % len(options)
+
+    @kb.add("down")
+    @kb.add("j")
+    def _(event):  # noqa: ANN001
+        state["index"] = (state["index"] + 1) % len(options)
+
+    @kb.add("enter")
+    def _(event):  # noqa: ANN001
+        event.app.exit(result=values[state["index"]])
+
+    @kb.add("c-c")
+    @kb.add("escape")
+    def _(event):  # noqa: ANN001
+        event.app.exit(exception=KeyboardInterrupt)
+
+    header = FormattedTextControl(
+        lambda: [("class:label", f"{label}  "), ("class:hint", "(↑/↓ to move, Enter to select)")]
+    )
+    body = FormattedTextControl(render, focusable=True)
+    layout = Layout(HSplit([
+        Window(header, height=1),
+        Window(body, height=len(options) * 2),
+    ]))
+    style = Style.from_dict({
+        "label": "bold #00afaf",
+        "hint": "#808080",
+        "option": "#d0d0d0",
+        "option.selected": "#d75fff bold",
+        "meta": "#808080",
+        "meta.selected": "#af87ff",
+    })
+    app = Application(layout=layout, key_bindings=kb, style=style, full_screen=False)
+    try:
+        result = app.run()
+    except KeyboardInterrupt:
+        raise typer.Abort() from None
+
+    chosen = next(desc for value, desc in options if value == result)
+    typer.echo(f"{label}: {result}  ({chosen})")
+    return result
 
 
 def _prompt_choice(label: str, *, choices: list[str], default: str) -> str:
