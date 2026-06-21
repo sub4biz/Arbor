@@ -421,17 +421,28 @@ def worktree_create(
         raise ValueError(f"node {node_id!r} not found")
     branch = branch or _branch_name(branch_prefix, node_id, node.hypothesis)
 
-    wt = _worktree_base("worktrees") / branch.replace("/", "__").replace(".", "_")
-    if wt.exists():
-        # `git worktree remove` only handles registered worktrees; rmtree also
-        # clears an orphaned directory so the subsequent `worktree add` (which
-        # refuses a non-empty path) succeeds on a retry.
-        git(cwd, "worktree", "remove", "--force", str(wt))
-        shutil.rmtree(wt, ignore_errors=True)
     start = trunk or "HEAD"
-    rc, out = git(cwd, "worktree", "add", "-b", branch, str(wt), start)
+
+    def _add(branch_name: str) -> tuple[int, str, Path]:
+        wt = _worktree_base("worktrees") / branch_name.replace("/", "__").replace(".", "_")
+        if wt.exists():
+            # `git worktree remove` only handles registered worktrees; rmtree also
+            # clears an orphaned directory so the subsequent `worktree add` (which
+            # refuses a non-empty path) succeeds on a retry.
+            git(cwd, "worktree", "remove", "--force", str(wt))
+            shutil.rmtree(wt, ignore_errors=True)
+        rc, out = git(cwd, "worktree", "add", "-b", branch_name, str(wt), start)
+        return rc, out, wt
+
+    rc, out, wt = _add(branch)
     if rc != 0:
-        raise RuntimeError(f"git worktree add failed: {out}")
+        # The branch likely already exists from a prior iteration (worktree_remove
+        # preserves branches for later merging). Mirror the native runtime and
+        # retry under a unique timestamp suffix instead of failing the retry.
+        branch = f"{branch}-{time.strftime('%m%d-%H%M%S', time.gmtime())}"
+        rc, out, wt = _add(branch)
+        if rc != 0:
+            raise RuntimeError(f"git worktree add failed: {out}")
 
     tree.update_node(node_id, status="running", code_ref=branch)
     return {"worktree": str(wt), "branch": branch, "node_id": node_id}

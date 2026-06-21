@@ -246,3 +246,21 @@ def test_worktree_create_and_remove(tmp_path: Path) -> None:
 
     rm = ops.worktree_remove(repo, res["worktree"])
     assert rm["returncode"] == 0
+
+
+def test_worktree_create_recovers_when_branch_already_exists(tmp_path: Path) -> None:
+    # worktree_remove preserves the branch (for later merging), so iterating on
+    # the same node must not fail on the deterministic branch name — it should
+    # recover under a suffixed branch rather than raising.
+    if not _git_worktree_works(tmp_path / "_probe"):
+        pytest.skip("git worktree not functional in this environment")
+    repo = _init_repo(tmp_path)
+    ops.tree_add_node(repo, "r", "ROOT", "idea")
+
+    first = ops.worktree_create(repo, "r", "1", branch="exp/dup")
+    ops.worktree_remove(repo, first["worktree"])  # branch 'exp/dup' is preserved
+
+    second = ops.worktree_create(repo, "r", "1", branch="exp/dup")
+    assert second["branch"] != "exp/dup"  # recovered under a unique suffix
+    assert Path(second["worktree"]).is_dir()
+    ops.worktree_remove(repo, second["worktree"])
