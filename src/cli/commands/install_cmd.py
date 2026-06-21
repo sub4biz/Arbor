@@ -16,7 +16,7 @@ Design notes
   ``arbor-``. A user's own unrelated skills living in the same target directory
   are never read, copied, or removed.
 * **No LLM, no key.** This command performs pure filesystem work; it is part of
-  Arbor's "host model is the brain" integration path.
+  Arbor's keyless coding-agent integration path.
 
 The public, unit-tested surface is the small pure-function layer
 (:func:`bundled_skills_root`, :func:`discover_skill_dirs`, :func:`resolve_target`,

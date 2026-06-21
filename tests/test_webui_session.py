@@ -1,4 +1,4 @@
-"""Tests for the keyless, session-backed WebUI (Deliverable 3).
+"""Tests for the keyless, session-backed WebUI.
 
 Covers the session→snapshot mapping (``build_session_snapshot``) and an
 end-to-end check that the file-backed ``WebUIServer`` serves that snapshot over

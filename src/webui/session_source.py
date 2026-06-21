@@ -1,9 +1,9 @@
 """Build a WebUI snapshot from a *durable session directory* (no live runtime).
 
 The push-based WebUI (:mod:`arbor.webui.server`) normally renders a live
-``RunState`` fed by the native runtime's ``EventBus``. In the keyless,
-"host-model-is-the-brain" flow there is no orchestrator and no bus — the host
-agent mutates session state through the ``arbor mcp`` tools, which persist to
+``RunState`` fed by the native runtime's ``EventBus``. When a host coding agent
+drives the loop instead, there is no orchestrator and no bus — the host agent
+mutates session state through the ``arbor mcp`` tools, which persist to
 ``.arbor/sessions/<run>/``. This module reads that on-disk state and produces the
 *same* snapshot dict shape the browser already understands
 (:func:`arbor.webui.snapshot.empty_state_dict`), so the existing page renders

@@ -110,7 +110,7 @@ This repository includes three ways to use Arbor:
 | Version | Location | Best for | Needs an API key? |
 | --- | --- | --- | --- |
 | Native CLI runtime | Python package and `arbor` command | Real Arbor research runs, long experiments, dashboard, checkpoints, executor tools, merge/test discipline, plugins, reports | **Yes** — configure a provider/model in `arbor setup`. |
-| Keyless harness integration | `arbor install` + `arbor mcp` (or the Claude Code plugin) | Running Arbor **inside Claude Code / Codex using that harness's own model** — e.g. a Claude subscription plan, where there is no API key to give Arbor | **No** — the host model is the brain; Arbor only supplies deterministic tools. |
+| Keyless harness integration | `arbor install` + `arbor mcp` (or the Claude Code plugin) | Running Arbor **inside Claude Code / Codex using that harness's own model** — e.g. a Claude subscription plan, where there is no API key to give Arbor | **No** — the host agent's model does the reasoning; Arbor only supplies deterministic tools. |
 | Agent Skill Suite (standalone) | [`skills/`](skills/README.md) | The same harness flow without even installing the package — pure instructions + a stdlib fallback helper | **No** |
 
 If you can run the CLI and have an API key, the native runtime gives the most

@@ -2,7 +2,7 @@
 
 The server build requires the optional MCP SDK; these tests skip cleanly if it
 is not installed. They assert the advertised tool surface and — crucially — that
-constructing the server pulls in **no** LLM/provider code (the keyless guarantee).
+constructing the server pulls in no LLM/provider code and needs no API key.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ def test_build_server_registers_every_tool() -> None:
 
 
 def test_server_build_requires_no_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keyless guarantee (behavioural): the server builds with no provider keys set."""
+    """The server builds successfully with no provider API keys set."""
     pytest.importorskip("mcp", reason="MCP SDK (the [mcp] extra) is not installed")
     for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY"):
         monkeypatch.delenv(var, raising=False)
@@ -49,7 +49,7 @@ def test_server_build_requires_no_api_key(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_server_import_does_not_load_llm_modules() -> None:
-    """Keyless guarantee (structural): building the server loads NO LLM/agent code.
+    """Building the server must load no LLM/agent code (it makes no model calls).
 
     Run in a *fresh* subprocess so the check is hermetic — other tests in the
     suite import the LLM stack, which would otherwise pollute ``sys.modules``.
