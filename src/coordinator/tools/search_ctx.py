@@ -82,6 +82,50 @@ def _track(task: asyncio.Task) -> asyncio.Task:
     return task
 
 
+def dispatch_auto_search(
+    tree: "IdeaTree",
+    config: "CoordinatorConfig",
+    provider: "LLMProvider",
+    node_id: str,
+    focus: str | None = None,
+) -> bool:
+    """Fire-and-forget a *pre-experiment* novelty check on a freshly-added node.
+
+    Unlike ``SearchIdeaContext``, this bypasses ``_validation_gate`` (it calls
+    ``_run_one`` directly), so a pending/unexecuted node is searched on its
+    hypothesis alone. The verdict is written to ``node.related_work``; it is
+    advisory and never blocks the coordinator.
+
+    No-op (returns False) unless ``search.enabled``, a backend is configured,
+    and ``search.auto_search_on_add`` is set. The task is tracked in
+    ``_BG_TASKS`` so the orchestrator's shutdown flush awaits it.
+    """
+    sc = getattr(config, "search", None)
+    if not (sc and sc.enabled and sc.has_backend and sc.auto_search_on_add):
+        return False
+    if focus is None:
+        focus = sc.auto_search_focus
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        # No running event loop — cannot dispatch a background task.
+        log.warning("dispatch_auto_search: no running event loop for %s", node_id)
+        return False
+    _track(
+        loop.create_task(
+            _run_one(
+                tree=tree,
+                config=config,
+                provider=provider,
+                node_id=node_id,
+                focus=focus,
+            ),
+            name=f"search-agent(pre):{node_id}",
+        )
+    )
+    return True
+
+
 def pending_search_count() -> int:
     """Return the number of in-flight background SearchAgent tasks."""
     return sum(1 for t in _BG_TASKS if not t.done())
@@ -250,8 +294,8 @@ async def _run_one(
     if not node.hypothesis.strip():
         return f"Error: node {node_id} has no hypothesis to search for."
 
-    if not sc.web_search_endpoint:
-        marker = "[search-failed: no web_search_endpoint configured]"
+    if not sc.has_backend:
+        marker = "[search-failed: no search backend configured]"
         await tree.async_update_node(node_id, related_work=marker)
         return f"{node_id}: {marker}"
 
@@ -396,8 +440,8 @@ class SearchIdeaContextTool(Tool):
             return f"Error: node {node_id!r} not found."
         if not node.hypothesis.strip():
             return f"Error: node {node_id} has no hypothesis to search for."
-        if not self._config.search.web_search_endpoint:
-            marker = "[search-failed: no web_search_endpoint configured]"
+        if not self._config.search.has_backend:
+            marker = "[search-failed: no search backend configured]"
             await self._tree.async_update_node(node_id, related_work=marker)
             return f"{node_id}: {marker}"
 

@@ -629,7 +629,7 @@ def _environment_section(config: CoordinatorConfig) -> str:
 
 def _related_work_annotation_section(config: CoordinatorConfig) -> str:
     sc = getattr(config, "search", None)
-    if sc is None or not sc.web_search_endpoint:
+    if sc is None or not sc.enabled or not sc.has_backend:
         return ""
 
     mode = (sc.mode or "executor").lower()
@@ -656,6 +656,22 @@ def _related_work_annotation_section(config: CoordinatorConfig) -> str:
             if sc.require_validated
             else "Runs on any node with a hypothesis (no validation gate)."
         )
+        auto_note = (
+            """
+## Pre-experiment novelty check (auto)
+
+A pre-experiment novelty check is **dispatched automatically** whenever you
+add a node with `TreeAddNode`; its verdict lands in that node's
+`related_work` field (background, non-blocking). BEFORE you `RunExecutor` on
+a fresh node, read `TreeView(format="node", node_id="<id>")`: if
+`novelty_assessment` is `prior-art-exists`, prefer revising the hypothesis or
+pruning the node over spending an executor on a non-novel idea. A
+`[search-failed: ...]` marker means no information — never treat it as
+evidence of novelty.
+"""
+            if sc.auto_search_on_add
+            else ""
+        )
         return f"""\
 # Related-Work Annotation (post-experiment novelty check, via SearchAgent)
 
@@ -668,6 +684,7 @@ visited pages never enter your own context window.
 {validated_note}
 
 {bg_note}
+{auto_note}
 
 ## When to use
 - **Standard path.** Right after `RunExecutor` reports a node as `done`

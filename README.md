@@ -34,6 +34,7 @@ environment and workflow.
 
 ## 📣 News
 
+- **2026-06** — **Built-in literature search & idea novelty checks.** Arbor can now ground its research in prior work via the public [alphaXiv](https://www.alphaxiv.org) API — zero config, no search endpoint or key. Novelty-check any idea before you build it with `arbor idea-check "<your idea>"`, or let the Coordinator vet every new branch automatically. See [Literature Search & Novelty Checks](#-literature-search--novelty-checks). 🔎
 - **2026-06** — Arbor was featured by [VentureBeat](https://venturebeat.com/), one of the leading tech media outlets in the US: ["New AI optimization framework beats Claude Code and Codex by 2.5x on the same compute budget"](https://venturebeat.com/orchestration/new-ai-optimization-framework-beats-claude-code-and-codex-by-2-5x-on-the-same-compute-budget). 📰
 - **2026-06** — Arbor's native CLI runtime and Agent Skill Suite (Codex / Claude Code) are released. 🚀
 - **2026-06** — The Arbor paper is released on [arXiv](https://arxiv.org/abs/2606.11926). 🎉
@@ -54,6 +55,10 @@ environment and workflow.
 * **Real experiment discipline** — Executors iterate on a dev split, validate on
   a held-out test split, and only merge gains that clear a configurable margin,
   reducing overfitting to the metric being optimized.
+* **Literature-grounded ideas** — A built-in, zero-config search backend over the
+  public [alphaXiv](https://www.alphaxiv.org) API lets Arbor check an idea's
+  novelty and prior art *before* spending compute on it — surfaced as a verdict on
+  each Idea Tree node, or on demand via `arbor idea-check`.
 * **Isolated, reversible execution** — Every experiment runs in its own git
   worktree on a dedicated branch, so your `main` branch is never touched until
   you choose to merge.
@@ -393,6 +398,7 @@ Day to day you only need `arbor`:
 | `arbor quickstart` | Get running fast with a free key (Gemini/Groq) or a local model (Ollama). |
 | `arbor setup` | Configure provider / model / keys → `~/.arbor/config.yaml`. |
 | `arbor report <session>` | Re-render `REPORT.md` for a past session. |
+| `arbor idea-check "<idea>"` | Novelty / prior-art check for one idea against alphaXiv (needs the `[search]` extra). |
 | `arbor export <session> [output]` | Export a past session to self-contained HTML, or JSONL when `output` ends in `.jsonl`. |
 | `arbor doctor` | Diagnose install, PATH, git, and API keys. |
 | `arbor version` | Print the installed version. |
@@ -402,6 +408,67 @@ Day to day you only need `arbor`:
 
 Lower-level entry points (`run-research`, `coordinator`, `executor`, `review-research`)
 remain for debugging — see the [CLI reference](https://RUC-NLPIR.github.io/Arbor/docs/cli/).
+
+---
+
+## 🔎 Literature Search & Novelty Checks
+
+Good research starts by knowing what already exists. Arbor ships a **zero-config
+search backend** over the public [alphaXiv](https://www.alphaxiv.org) API — no
+self-hosted search service, no alphaXiv key — so it can survey related work and
+judge an idea's novelty. The verdict is lightweight and decision-oriented: a short
+summary of the space, the closest related papers, a `novel` / `partial-overlap` /
+`prior-art-exists` assessment, and the concrete overlap risks.
+
+### Enable it
+
+The backend lives in an optional extra (it pulls in `alphaxiv-py`, which needs
+Python ≥ 3.12):
+
+```bash
+pip install 'arbor-agent[search]'
+```
+
+It reuses your existing Arbor LLM credentials — nothing else to configure.
+
+### Use it three ways
+
+**1. Standalone — check one idea, no run required.** The fastest way to sanity-check
+a direction before you invest in it:
+
+```bash
+arbor idea-check "Use entity-relation scratchpads to improve multi-hop QA"
+arbor idea-check "tree search over plans for code generation" --json   # raw JSON
+```
+
+**2. Pre-experiment — vet every idea automatically.** Turn on `auto_search_on_add`
+and the Coordinator dispatches a background novelty check the moment a new idea is
+added to the tree; the verdict lands in that node's `related_work` field *before* an
+Executor ever runs, so Arbor can revise or prune non-novel ideas instead of spending
+compute on them:
+
+```yaml title="research_config.yaml"
+search:
+  enabled: true
+  builtin_backend: alphaxiv     # none | alphaxiv
+  auto_search_on_add: true      # novelty-check each new idea before running it
+```
+
+**3. Post-experiment — annotate what worked.** By default (`auto_search_on_add:
+false`) Arbor still surveys related work for ideas that *beat the trunk*, attaching
+prior-art context right before a merge decision — so wins arrive with citations.
+
+### Turn it off
+
+It is **off by default** — with no `search` block and no `[search]` extra installed,
+Arbor never touches the network for literature. To disable explicitly, set
+`search.enabled: false` (or leave `builtin_backend: none`). Prefer your own search
+service? The bring-your-own-endpoint path still works via
+`search.web_search_endpoint` for a self-hosted BrowseComp-style backend.
+
+See the [configuration guide](https://RUC-NLPIR.github.io/Arbor/docs/configuration/)
+and [`arbor idea-check`](https://RUC-NLPIR.github.io/Arbor/docs/cli/#arbor-idea-check)
+for every option.
 
 ---
 

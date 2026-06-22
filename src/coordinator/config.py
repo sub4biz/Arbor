@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 from pydantic import BaseModel
 from pydantic import Field as PydField
@@ -299,7 +299,19 @@ class SearchConfig(BaseModel):
     # SearchAgent runs concurrently with the coordinator's other work.
     # When False, the tool blocks until the search finishes.
     background: bool = True
-    auto_search_on_add: bool = False      # Phase 2 hook; not wired in Phase 1
+    # When True, TreeAddNode dispatches a background pre-experiment SearchAgent
+    # on the newly-added node's hypothesis (novelty/prior-art check BEFORE any
+    # executor runs). The verdict lands in the node's ``related_work`` field;
+    # it is advisory and never blocks dispatch. Requires a configured backend
+    # (``web_search_endpoint`` or ``builtin_backend``).
+    auto_search_on_add: bool = False
+    # Optional focus directive applied to the pre-experiment auto-search.
+    auto_search_focus: str | None = None
+    # Built-in, zero-config search backend. ``"none"`` (default) uses the HTTP
+    # endpoints above. ``"alphaxiv"`` queries the public alphaXiv API in-process
+    # (no endpoint URL, no API key) — requires the optional ``[search]`` extra
+    # (``pip install 'arbor-agent[search]'``, Python >= 3.12).
+    builtin_backend: Literal["none", "alphaxiv"] = "none"
     # Tool-surface mode:
     #   "executor" (default) — register SearchIdeaContext / SearchIdeaContextParallel
     #     on the coordinator. The raw web_search / web_visit tools are NOT exposed,
@@ -308,6 +320,12 @@ class SearchConfig(BaseModel):
     #     coordinator (Phase-1 surface). Useful for debugging the raw tools or
     #     when you want full coordinator control of the loop.
     mode: str = "executor"
+
+    @property
+    def has_backend(self) -> bool:
+        """True when a search backend is available — either a self-hosted HTTP
+        endpoint or the built-in alphaXiv backend."""
+        return bool(self.web_search_endpoint) or self.builtin_backend == "alphaxiv"
 
     @model_validator(mode="after")
     def _apply_env_fallbacks(self) -> "SearchConfig":

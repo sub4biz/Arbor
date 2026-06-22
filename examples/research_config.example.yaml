@@ -42,6 +42,15 @@ ui:
   interaction_mode: auto  # auto | direction | review | collaborative
   # webui_port: 8765       # set to expose the read-only WebUI
 
+# Literature search / idea novelty checks (optional). Zero-config: queries the
+# public alphaXiv API in-process — no search endpoint, no key. Needs the search
+# extra:  pip install 'arbor-agent[search]'  (Python >= 3.12).
+search:
+  enabled: true
+  builtin_backend: alphaxiv   # none (default) | alphaxiv
+  auto_search_on_add: false   # true => novelty-check each new idea BEFORE running it
+  # web_search_endpoint: ...  # bring-your-own BrowseComp-style HTTP backend instead
+
 # ─────────────────────────────────────────────────────────────────────────────
 # More LLM examples — copy the one you need into `llm:` above.
 # ─────────────────────────────────────────────────────────────────────────────

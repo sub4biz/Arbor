@@ -13,6 +13,7 @@ complete reference.
 | `arbor config` | Inspect and manage stored configuration. |
 | `arbor doctor` | Diagnose your environment (PATH, Python, git, API keys). |
 | `arbor report` | Work with a finished run's report. |
+| `arbor idea-check` | Novelty / prior-art check for a single idea against the public alphaXiv API. |
 | `arbor version` | Print the installed version. |
 
 !!! tip
@@ -103,6 +104,38 @@ type `/`; `/help` lists them all.
 | `/resume` | Resume after `/pause`. |
 | `/report` | Show session/report artifact paths. |
 | `/abort` (or `/quit`) | Abort the run. |
+
+## `arbor idea-check`
+
+Run a quick novelty / prior-art check on a single research idea, without
+starting a full run. It dispatches one SearchAgent that surveys the public
+[alphaXiv](https://www.alphaxiv.org) literature and prints a lightweight
+verdict: a summary of what's been done, the closest related papers, a novelty
+assessment (`novel` / `partial-overlap` / `prior-art-exists`), and overlap
+risks.
+
+```bash
+# Install the optional search backend once (needs Python >= 3.12):
+pip install 'arbor-agent[search]'
+
+arbor idea-check "Use entity-relation scratchpads to improve multi-hop QA"
+arbor idea-check "tree search over plans for code generation" --json
+```
+
+Zero-config: no search endpoint or alphaXiv API key is required — it queries
+alphaXiv's public endpoints directly. Reuses your existing Arbor LLM
+credentials (`arbor login` / API key).
+
+| Option | What it does |
+| --- | --- |
+| `--focus TEXT` | Optional focus directive (e.g. `prefer arxiv 2024`). |
+| `--model TEXT` | Override the model used for the check. |
+| `--json` | Print the raw SearchAgent JSON instead of rendered Markdown. |
+| `--cwd PATH` | Working directory (default: current directory). |
+
+The same backend powers the coordinator's in-run novelty checks — see
+[Configuration](configuration.md) for `search.builtin_backend` and
+`search.auto_search_on_add`.
 
 ## Other entry points
 

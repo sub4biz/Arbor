@@ -222,7 +222,26 @@ timeout:
 ui:
   interaction_mode: auto         # auto | direction | review | collaborative
   webui_port: 8765               # read-only browser monitor
+
+# ── Literature search / novelty checks ────────────────
+search:
+  enabled: true
+  builtin_backend: alphaxiv      # none | alphaxiv (zero-config public API)
+  auto_search_on_add: false      # novelty-check every new idea before running it
 ```
+
+!!! tip "Built-in literature search"
+    Set `search.builtin_backend: alphaxiv` to let Arbor survey related work over
+    the public [alphaXiv](https://www.alphaxiv.org) API — no search endpoint or
+    API key needed. Install the optional extra first:
+    `pip install 'arbor-agent[search]'` (requires Python ≥ 3.12).
+
+    With `auto_search_on_add: true`, every idea added to the tree gets a
+    **pre-experiment** novelty check whose verdict lands in the node's
+    `related_work` field (advisory, never blocking). For a one-off check
+    outside a run, use [`arbor idea-check`](cli.md#arbor-idea-check). The legacy
+    bring-your-own setup (`search.web_search_endpoint`) still works for
+    self-hosted BrowseComp-style backends.
 
 !!! note "Flat keys also work"
     The nested groups (`llm:`, `timeout:`, `ui:`) are the recommended style, but equivalent

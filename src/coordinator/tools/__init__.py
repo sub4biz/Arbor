@@ -9,7 +9,12 @@ from ...core.tools.bash import BashTool
 from ...core.tools.file_read import FileReadTool
 from ...core.tools.grep import GrepTool
 from ...core.tools.glob_tool import GlobTool
-from ...core.tools.web import WebSearchTool, WebVisitTool
+from ...core.tools.web import (
+    AlphaXivSearchTool,
+    AlphaXivVisitTool,
+    WebSearchTool,
+    WebVisitTool,
+)
 from ...core.tools.skill import LoadSkillTool
 from ...core.skill_registry import build_default_registry
 
@@ -52,7 +57,7 @@ def get_coordinator_tools(
     tools: list[Tool] = [
         # Tree operations
         TreeViewTool(cwd=cwd, tree=tree, workspace_dir=wdir),
-        TreeAddNodeTool(cwd=cwd, tree=tree, config=config, workspace_dir=wdir),
+        TreeAddNodeTool(cwd=cwd, tree=tree, config=config, provider=provider, workspace_dir=wdir),
         TreeUpdateNodeTool(cwd=cwd, tree=tree, workspace_dir=wdir),
         TreePruneTool(cwd=cwd, tree=tree, workspace_dir=wdir),
         TreeSetMetaTool(cwd=cwd, tree=tree, config=config, workspace_dir=wdir),
@@ -94,29 +99,40 @@ def get_coordinator_tools(
 
     # ── Web search / browse — only registered if enabled and configured ──
     sc = getattr(config, "search", None)
-    if sc is not None and sc.enabled and sc.web_search_endpoint:
+    if sc is not None and sc.enabled and sc.has_backend:
         mode = (sc.mode or "executor").lower()
+        use_alphaxiv = sc.builtin_backend == "alphaxiv"
         if mode == "inline":
             # Phase-1 surface: coordinator calls the raw web tools itself.
-            tools.append(
-                WebSearchTool(
-                    cwd=cwd,
-                    endpoint_url=sc.web_search_endpoint,
-                    provider=sc.web_search_provider,
-                    api_key=sc.web_search_api_key,
-                    workspace_dir=wdir,
-                )
-            )
-            if sc.web_browse_endpoint:
+            if use_alphaxiv:
+                tools.append(AlphaXivSearchTool(cwd=cwd, workspace_dir=wdir))
                 tools.append(
-                    WebVisitTool(
+                    AlphaXivVisitTool(
                         cwd=cwd,
-                        endpoint_url=sc.web_browse_endpoint,
                         max_content_tokens=sc.visit_max_content_tokens,
-                        api_key=sc.web_browse_api_key,
                         workspace_dir=wdir,
                     )
                 )
+            else:
+                tools.append(
+                    WebSearchTool(
+                        cwd=cwd,
+                        endpoint_url=sc.web_search_endpoint,
+                        provider=sc.web_search_provider,
+                        api_key=sc.web_search_api_key,
+                        workspace_dir=wdir,
+                    )
+                )
+                if sc.web_browse_endpoint:
+                    tools.append(
+                        WebVisitTool(
+                            cwd=cwd,
+                            endpoint_url=sc.web_browse_endpoint,
+                            max_content_tokens=sc.visit_max_content_tokens,
+                            api_key=sc.web_browse_api_key,
+                            workspace_dir=wdir,
+                        )
+                    )
         else:
             # Phase-2 surface (default): coordinator dispatches a SearchAgent.
             # Raw web tools are NOT registered — the SearchAgent owns that
