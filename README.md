@@ -41,36 +41,23 @@ environment and workflow.
 
 ## 💡 Why Arbor
 
-* **General-purpose optimization** — From model training and harness engineering
-  to data synthesis, Arbor can optimize any task as long as it has a target to
-  improve and a metric to measure progress.
-* **Practical agent runtime** — Arbor is not only a research prototype; it ships
-  with both a native CLI runtime and an Agent Skill Suite for Codex and Claude
-  Code, so you can use the full CLI for the strongest Arbor behavior or load the
-  skill suite inside another coding agent.
-* **Long-horizon structured exploration** — The hypothesis-tree framework lets
-  Arbor keep running as a cumulative search: results, failure modes, and
-  distilled insights persist in the Idea Tree and propagate upward, so later
-  ideas start smarter instead of being lost in a scrollback buffer.
-* **Real experiment discipline** — Executors iterate on a dev split, validate on
-  a held-out test split, and only merge gains that clear a configurable margin,
-  reducing overfitting to the metric being optimized.
-* **Literature-grounded ideas** — A built-in, zero-config search backend over the
-  public [alphaXiv](https://www.alphaxiv.org) API lets Arbor check an idea's
-  novelty and prior art *before* spending compute on it — surfaced as a verdict on
-  each Idea Tree node, or on demand via `arbor idea-check`.
-* **Isolated, reversible execution** — Every experiment runs in its own git
-  worktree on a dedicated branch, so your `main` branch is never touched until
-  you choose to merge.
-* **Built for long experiments** — Long-running training is first-class, with
-  generous timeouts, partial-metric recovery on timeout, and optional staged
-  budgets from smoke to pilot to full runs.
-* **Model and workflow flexibility** — Arbor supports Anthropic, OpenAI /
-  Responses API, and OpenAI-compatible backends through LiteLLM, including
-  DeepSeek, Gemini, Qwen, vLLM, Ollama, and local gateways.
-* **Steerable and adaptable** — A live terminal dashboard, read-only WebUI,
-  optional human-in-the-loop review, and one-line domain plugins let you steer
-  experiments without changing Arbor's core code.
+* **General-purpose optimization** — optimizes any task with a target to improve
+  and a metric to measure, from model training to harness engineering to data synthesis.
+* **Long-horizon structured exploration** — the hypothesis-tree framework keeps
+  results, failure modes, and distilled insights in the Idea Tree and propagates them
+  upward, so later ideas start smarter instead of scrolling off.
+* **Real experiment discipline** — Executors iterate on a dev split, validate on a
+  held-out test split, and only merge gains that clear a configurable margin — each in
+  its own git worktree, so `main` is never touched until you merge.
+* **Literature-grounded ideas** — keyless search backends (alphaXiv + web) check an
+  idea's novelty and prior art *before* spending compute, via node verdicts or
+  `arbor idea-check`.
+* **Model and workflow flexibility** — Anthropic, OpenAI / Responses API, and
+  OpenAI-compatible backends via LiteLLM (DeepSeek, Gemini, Qwen, vLLM, Ollama, …),
+  usable as a native CLI or an Agent Skill Suite inside Codex / Claude Code.
+* **Steerable** — a live dashboard, read-only WebUI, optional human-in-the-loop
+  review, and one-line domain plugins let you steer runs without touching the core.
+
 
 ## 🧩 Framework
 

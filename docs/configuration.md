@@ -223,25 +223,57 @@ ui:
   interaction_mode: auto         # auto | direction | review | collaborative
   webui_port: 8765               # read-only browser monitor
 
-# ── Literature search / novelty checks ────────────────
+# ── Literature search / external knowledge ────────────
 search:
   enabled: true
-  builtin_backend: alphaxiv      # none | alphaxiv (zero-config public API)
+  backends: [alphaxiv, jina]     # ordered; fanned out & merged (see below)
+  grounded_ideation: false       # let the coordinator search during ideation
   auto_search_on_add: false      # novelty-check every new idea before running it
 ```
 
-!!! tip "Built-in literature search"
-    Set `search.builtin_backend: alphaxiv` to let Arbor survey related work over
-    the public [alphaXiv](https://www.alphaxiv.org) API — no search endpoint or
-    API key needed. The backend (`alphaxiv-py`) ships with Arbor by default on
-    **Python ≥ 3.12**; on 3.10/3.11 it is unavailable.
+!!! tip "Search backends (`search.backends`)"
+    The search agent uses two kinds of tool: **search** (find candidate URLs)
+    and **visit** (read a page). `search.backends` is an ordered list of search
+    backends; results from all of them are merged and de-duplicated, so you can
+    combine sources:
 
-    With `auto_search_on_add: true`, every idea added to the tree gets a
-    **pre-experiment** novelty check whose verdict lands in the node's
-    `related_work` field (advisory, never blocking). For a one-off check
-    outside a run, use [`arbor idea-check`](cli.md#arbor-idea-check). The legacy
-    bring-your-own setup (`search.web_search_endpoint`) still works for
-    self-hosted BrowseComp-style backends.
+    | backend | needs a key? | covers |
+    | --- | --- | --- |
+    | `alphaxiv` | no | arXiv / alphaXiv papers (Python ≥ 3.12) |
+    | `jina` | no (optional `JINA_API_KEY` raises limits) | general web (s.jina.ai) |
+    | `serper` | `SERPER_API_KEY` | Google results (serper.dev) |
+    | `exa` | `EXA_API_KEY` | neural web search (exa.ai) |
+    | `endpoint` | optional | self-hosted `web_search_endpoint` (BrowseComp-style) |
+
+    A backend whose key is missing is silently skipped. The fully **keyless**
+    default is `backends: [alphaxiv, jina]` — papers + general web, no setup.
+    Keys can be set in the config file (`serper_api_key` / `exa_api_key` /
+    `jina_api_key`) or via the matching env vars.
+
+    **Visiting pages (`search.visit_backend`).** `auto` (default) reads alphaXiv
+    papers via the SDK (full text) and any other URL via the keyless **Jina
+    reader** (`r.jina.ai`), falling back to a raw `requests` fetch — so no browse
+    endpoint or key is needed to open a page. Force a single fetcher with
+    `jina` | `requests` | `alphaxiv` | `endpoint`.
+
+    **Backward compatible.** The old `builtin_backend: alphaxiv` and
+    `web_search_endpoint` / `web_browse_endpoint` settings still work unchanged
+    (they map onto `backends` automatically when `backends` is empty).
+
+!!! tip "Grounded ideation vs. novelty audit (two separate lanes)"
+    With `grounded_ideation: true` the coordinator gets a **`ResearchSearch`**
+    tool it can call *during* ideation — to find related work for a draft idea,
+    survey how a field is solved, look up a fact, or scan a direction for gaps.
+    It is **off by default** so benchmark runs stay fair (the system can't crib
+    finished work off the web). The source(s) that shaped an idea are recorded
+    on the node's `grounding` field.
+
+    This is separate from the **post-experiment novelty audit**: with
+    `auto_search_on_add: true` (or via [`arbor idea-check`](cli.md#arbor-idea-check))
+    a dedicated SearchAgent surveys prior art *after* an idea proves out and
+    writes the node's `related_work` field. The two lanes run independent
+    searches and never share fetched text.
+
 
 !!! note "Flat keys also work"
     The nested groups (`llm:`, `timeout:`, `ui:`) are the recommended style, but equivalent
