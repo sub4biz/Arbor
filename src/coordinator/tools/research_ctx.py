@@ -138,10 +138,17 @@ async def _run_research(
     timeout = sc.agent_timeout
     if timeout is None or timeout <= 0:
         timeout = _RESEARCH_SOFT_TIMEOUT
+    # Grounded ideation reads for depth: give the visit tool a larger token
+    # budget so paper method/results sections survive truncation (roadmap 1.1d).
+    sc_research = sc.model_copy(update={
+        "visit_max_content_tokens": max(
+            getattr(sc, "research_visit_tokens", 0) or 0, sc.visit_max_content_tokens
+        ),
+    })
     try:
         agent = build_search_agent(
             provider=provider,
-            search_config=sc,
+            search_config=sc_research,
             cwd=config.cwd,
             meta_config=config,
             context_window=config.context_window,

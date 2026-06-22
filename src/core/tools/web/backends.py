@@ -209,15 +209,16 @@ class ExaMcpBackend(SearchBackend):
     """Exa search via its hosted **MCP** server (``https://mcp.exa.ai/mcp``).
 
     Uses the MCP streamable-HTTP client (the same ``mcp`` package the Arbor MCP
-    server depends on) to call Exa's ``web_search_exa`` tool. Needs an Exa API
-    key (sent as the ``x-api-key`` header) and the optional ``mcp`` dependency
+    server depends on) to call Exa's ``web_search_exa`` tool. The hosted server
+    is **keyless** for basic use; pass an Exa API key (sent as ``x-api-key``) to
+    raise limits. Needs the optional ``mcp`` dependency
     (``pip install 'arbor-agent[mcp]'``).
     """
 
     name = "exa-mcp"
     DEFAULT_URL = "https://mcp.exa.ai/mcp"
 
-    def __init__(self, *, api_key: str, url: str | None = None,
+    def __init__(self, *, api_key: str | None = None, url: str | None = None,
                  tool: str = "web_search_exa", read_timeout: int = 30):
         self._api_key = api_key
         self._url = url or self.DEFAULT_URL
@@ -239,7 +240,7 @@ class ExaMcpBackend(SearchBackend):
                 "pip install 'arbor-agent[mcp]'"
             ) from exc
 
-        headers = {"x-api-key": self._api_key}
+        headers = {"x-api-key": self._api_key} if self._api_key else {}
         async with streamablehttp_client(self._url, headers=headers) as (read, write, _):
             async with ClientSession(read, write) as session:
                 await session.initialize()
@@ -255,14 +256,26 @@ class ExaMcpBackend(SearchBackend):
         ]
         return "\n".join(parts)
 
-    @staticmethod
-    def _parse(text: str) -> list[dict]:
-        """Defensively map Exa MCP's (text/JSON) result into search items."""
-        import json
+    @classmethod
+    def _parse(cls, text: str) -> list[dict]:
+        """Map Exa MCP's output into search items.
 
+        The hosted ``web_search_exa`` returns a plain-text block (``Title:`` /
+        ``URL:`` / ``Published:`` / ``Author:`` / ``Highlights:`` per result);
+        some configs may return JSON. Try JSON first, then the text format.
+        """
         text = (text or "").strip()
         if not text:
             return []
+        items = cls._parse_json(text)
+        if items:
+            return items
+        return cls._parse_text(text)
+
+    @staticmethod
+    def _parse_json(text: str) -> list[dict]:
+        import json
+
         try:
             data = json.loads(text)
         except json.JSONDecodeError:
@@ -288,6 +301,50 @@ class ExaMcpBackend(SearchBackend):
                 "title": r.get("title") or "No Title",
                 "snippets": _snippet(prefix, body),
             })
+        return items
+
+    @staticmethod
+    def _parse_text(text: str) -> list[dict]:
+        """Parse the ``Title:/URL:/Published:/Author:/Highlights:`` text block."""
+        items: list[dict] = []
+        cur: dict | None = None
+        hl: list[str] = []
+        in_hl = False
+
+        def flush() -> None:
+            if cur and cur.get("url"):
+                body = " ".join(s.strip() for s in hl if s.strip())
+                meta = [
+                    v for v in (cur.get("author", ""), cur.get("published", ""))
+                    if v and v != "N/A"
+                ]
+                items.append({
+                    "url": cur["url"],
+                    "title": cur.get("title") or "No Title",
+                    "snippets": _snippet(" · ".join(meta), body),
+                })
+
+        for line in text.splitlines():
+            s = line.strip()
+            if s.startswith("Title:"):
+                flush()
+                cur, hl, in_hl = {"title": s[6:].strip()}, [], False
+            elif cur is None:
+                continue
+            elif s.startswith("URL:"):
+                cur["url"] = s[4:].strip()
+                in_hl = False
+            elif s.startswith("Published:"):
+                cur["published"] = s[10:].strip()
+                in_hl = False
+            elif s.startswith("Author:"):
+                cur["author"] = s[7:].strip()
+                in_hl = False
+            elif s.startswith("Highlights:"):
+                in_hl = True
+            elif in_hl:
+                hl.append(line)
+        flush()
         return items
 
 
@@ -325,8 +382,8 @@ def resolve_backend_names(sc: Any) -> list[str]:
             continue
         if n == "exa" and not _exa_key(sc):
             continue
-        if n == "exa-mcp" and not _exa_key(sc):
-            continue
+        # exa-mcp is keyless (the hosted server works without a key); an
+        # optional Exa key just raises limits.
         usable.append(n)
     return list(dict.fromkeys(usable))
 

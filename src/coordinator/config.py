@@ -291,6 +291,11 @@ class SearchConfig(BaseModel):
     # tool runs on any node with a hypothesis.
     require_validated: bool = True
     visit_max_content_tokens: int = 2048
+    # Full-text budget for the grounded-ideation (ResearchSearch) lane. Larger
+    # than visit_max_content_tokens so the model can read a paper's method /
+    # results sections, not just the abstract (roadmap 1.1d). The novelty-audit
+    # lane keeps the smaller visit_max_content_tokens (abstracts suffice there).
+    research_visit_tokens: int = 6000
     agent_max_turns: int = 12             # Phase 2
     # Per-search wall-clock cap (seconds). ``None`` = unlimited; the SearchAgent
     # runs to completion (still bounded by ``agent_max_turns``). Background

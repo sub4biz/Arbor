@@ -211,6 +211,25 @@ def test_research_search_passes_research_system_prompt(monkeypatch):
     assert captured.get("system_prompt") == RESEARCH_AGENT_SYSTEM_PROMPT
 
 
+def test_research_lane_uses_full_text_budget(monkeypatch):
+    """The research lane bumps the visit token budget so method sections survive."""
+    captured: dict = {}
+
+    def _fake_build(**kw):
+        captured.update(kw)
+        return _FakeResearchAgent()
+
+    monkeypatch.setattr(sa_agent, "build_search_agent", _fake_build)
+    cfg = _cfg(grounded=True)
+    cfg.search.visit_max_content_tokens = 2048
+    cfg.search.research_visit_tokens = 6000
+    tool = ResearchSearchTool(cwd=".", config=cfg, provider=_Provider())
+    asyncio.run(tool.execute(query="x"))
+
+    sc_passed = captured["search_config"]
+    assert sc_passed.visit_max_content_tokens == 6000  # bumped for full-text reads
+
+
 # ── integrity: separation of the two lanes ───────────────────────────────────
 
 def test_research_does_not_touch_tree(monkeypatch):

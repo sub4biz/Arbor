@@ -91,7 +91,7 @@ the same paper from two backends merges to one).
 | `jina` | no (optional `JINA_API_KEY` raises limits) | general web (s.jina.ai) |
 | `serper` | `SERPER_API_KEY` | Google results (serper.dev) |
 | `exa` | `EXA_API_KEY` | neural web search (exa.ai REST) |
-| `exa-mcp` | `EXA_API_KEY` | Exa via its hosted MCP server |
+| `exa-mcp` | no (optional `EXA_API_KEY` raises limits) | Exa via its hosted MCP server |
 | `endpoint` | optional | self-hosted `web_search_endpoint` (BrowseComp-style) |
 
 A backend whose key is missing is **silently skipped**, so a list like
@@ -104,11 +104,11 @@ or the matching env vars (`SERPER_API_KEY`, `EXA_API_KEY`, `JINA_API_KEY`).
 
 !!! note "Exa via MCP"
     The `exa-mcp` backend calls Exa's hosted MCP server
-    (`https://mcp.exa.ai/mcp`, auth via the `x-api-key` header; override the URL
-    with `exa_mcp_url`). It needs the optional MCP client:
+    (`https://mcp.exa.ai/mcp`; override the URL with `exa_mcp_url`). The hosted
+    server is **keyless** for basic use — set `exa_api_key` only to raise limits
+    (sent as the `x-api-key` header). It needs the MCP client:
     `pip install 'arbor-agent[mcp]'`. The plain `exa` backend hits the same
-    provider over its REST API and needs no extra dependency — pick whichever
-    fits your setup.
+    provider over its REST API (which *does* need a key) — pick whichever fits.
 
 ---
 
@@ -118,10 +118,19 @@ Reading a page is keyless too. `search.visit_backend: auto` (the default):
 
 - alphaXiv paper URLs → the alphaXiv SDK (full text), and
 - any other URL → the **Jina reader** (`r.jina.ai`, clean markdown, no key),
-  falling back to a raw `requests` fetch.
+  falling back to a raw `requests` fetch. **PDFs are read too** — the Jina
+  reader extracts PDF text, and the raw fallback parses PDFs via `pypdf`.
 
 So no browse endpoint or API key is needed to open a page. Force a single
 fetcher with `visit_backend: jina | requests | alphaxiv | endpoint`.
+
+**Reading depth (full text vs. abstract).** Page text is truncated to a token
+budget. The novelty-audit lane uses `visit_max_content_tokens` (default 2048 —
+abstracts are enough to judge prior art). The grounded-ideation lane reads for
+depth and uses the larger `research_visit_tokens` (default 6000) so a paper's
+**method / results sections survive truncation**, not just the abstract. Raise
+either for deeper reads (at higher token cost).
+
 
 ---
 

@@ -61,6 +61,21 @@ def _clean_markdown(text: str) -> str:
     return text
 
 
+def _pdf_to_text(data: bytes) -> str:
+    """Extract text from PDF bytes via pypdf (lazy import; '' if unavailable)."""
+    try:
+        import io
+
+        from pypdf import PdfReader
+    except ImportError:
+        return ""
+    try:
+        reader = PdfReader(io.BytesIO(data))
+        return "\n".join((page.extract_text() or "") for page in reader.pages).strip()
+    except Exception:  # noqa: BLE001 - malformed/encrypted PDF
+        return ""
+
+
 class JinaVisitTool(WebVisitTool):
     """Keyless ``web_visit`` via the Jina reader, with a raw-requests fallback."""
 
@@ -117,12 +132,15 @@ class JinaVisitTool(WebVisitTool):
             resp = requests.get(
                 url, headers={"User-Agent": _BROWSER_UA}, timeout=self._timeout
             )
-            if resp.status_code == 200:
-                ctype = resp.headers.get("Content-Type", "")
-                if "html" in ctype or not ctype:
-                    return _html_to_text(resp.text)
-                if "text" in ctype or "json" in ctype:
-                    return resp.text
+            if resp.status_code != 200:
+                return ""
+            ctype = resp.headers.get("Content-Type", "").lower()
+            if "pdf" in ctype or url.lower().split("?")[0].endswith(".pdf"):
+                return _pdf_to_text(resp.content)
+            if "html" in ctype or not ctype:
+                return _html_to_text(resp.text)
+            if "text" in ctype or "json" in ctype:
+                return resp.text
         except requests.RequestException:
             pass
         return ""
