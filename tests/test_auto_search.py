@@ -8,8 +8,9 @@ real SearchAgent / network is involved.
 from __future__ import annotations
 
 import asyncio
+import json
 
-
+import arbor.search_agent.agent as sa_agent
 from arbor.coordinator.config import CoordinatorConfig
 from arbor.coordinator.idea_tree import IdeaTree, Node
 from arbor.coordinator.tools import search_ctx
@@ -122,3 +123,84 @@ def test_tree_add_node_no_auto_search_when_disabled(monkeypatch):
     msg = asyncio.run(_go())
     assert "pre-experiment novelty check" not in msg
     assert calls == []
+
+
+# ── Integration: full pre-experiment chain, only the LLM agent mocked ─────────
+
+_CANNED = json.dumps(
+    {
+        "summary": "Tree-of-thought planning is already well studied.",
+        "related_papers": [
+            {
+                "title": "Tree of Thoughts",
+                "url": "https://www.alphaxiv.org/abs/2305.10601",
+                "one_line_relevance": "Closest planning-over-search method.",
+            }
+        ],
+        "novelty_assessment": "partial-overlap",
+        "overlap_risks": "Overlaps with ToT on the search structure.",
+    }
+)
+
+
+class _FakeSearchAgent:
+    """Stands in for the SearchAgent — returns a canned novelty JSON."""
+
+    total_turns = 1
+    total_input_tokens = 0
+    total_output_tokens = 0
+
+    async def run(self, _prompt: str) -> str:
+        return _CANNED
+
+
+def test_pre_experiment_chain_writes_rendered_related_work(monkeypatch):
+    """End-to-end pre-experiment path with ONLY build_search_agent mocked:
+    TreeAddNode -> dispatch_auto_search -> real _run_one -> JSON parse ->
+    _render_markdown -> node.related_work. No network, no LLM, no validation gate.
+    """
+    # _run_one imports build_search_agent from this module at call time.
+    monkeypatch.setattr(sa_agent, "build_search_agent", lambda **kw: _FakeSearchAgent())
+
+    tree = _tree()
+    tool = TreeAddNodeTool(cwd=".", tree=tree, config=_cfg(auto=True), provider=_Provider())
+
+    async def _go():
+        msg = await tool.execute(parent_id="ROOT", hypothesis="Tree search over plans")
+        await wait_for_pending_searches()
+        return msg
+
+    msg = asyncio.run(_go())
+    assert "pre-experiment novelty check dispatched" in msg
+
+    node = tree.get_node("1")
+    assert node is not None
+    rw = node.related_work
+    # The verdict was parsed and rendered into the documented Markdown shape.
+    assert "### Summary" in rw
+    assert "Tree of Thoughts" in rw
+    assert "https://www.alphaxiv.org/abs/2305.10601" in rw
+    assert "partial-overlap" in rw
+    assert "### Overlap Risks" in rw
+
+
+def test_pre_experiment_chain_handles_unparseable_output(monkeypatch):
+    """A non-JSON agent reply is stored as an [unparsed JSON] block, not a crash."""
+
+    class _BadAgent(_FakeSearchAgent):
+        async def run(self, _prompt: str) -> str:
+            return "the model rambled and never emitted JSON"
+
+    monkeypatch.setattr(sa_agent, "build_search_agent", lambda **kw: _BadAgent())
+
+    tree = _tree()
+    tool = TreeAddNodeTool(cwd=".", tree=tree, config=_cfg(auto=True), provider=_Provider())
+
+    async def _go():
+        await tool.execute(parent_id="ROOT", hypothesis="Some idea")
+        await wait_for_pending_searches()
+
+    asyncio.run(_go())
+    rw = tree.get_node("1").related_work
+    assert "[unparsed JSON" in rw
+    assert "rambled" in rw
