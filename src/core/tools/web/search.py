@@ -63,21 +63,30 @@ class WebSearchTool(Tool):
         self,
         *,
         cwd: str,
-        endpoint_url: str,
+        endpoint_url: str | None = None,
         provider: str = "google",
         max_results_per_query: int = 10,
         timeout: tuple[int, int] = (5, 30),
         api_key: str | None = None,
+        backends: list[Any] | None = None,
         **kwargs: Any,
     ):
         super().__init__(cwd=cwd, **kwargs)
-        if not endpoint_url:
-            raise ValueError("WebSearchTool requires a non-empty endpoint_url.")
-        self._endpoint_url = endpoint_url
         self._provider = provider
         self._max_results_per_query = max_results_per_query
         self._timeout = timeout
         self._api_key = api_key
+        # New multi-backend path: fan out across SearchBackend adapters.
+        # Legacy path: a single self-hosted HTTP endpoint (unchanged behavior).
+        self._backends = backends
+        if backends is None:
+            if not endpoint_url:
+                raise ValueError(
+                    "WebSearchTool requires a non-empty endpoint_url or a backends list."
+                )
+            self._endpoint_url = endpoint_url
+        elif not backends:
+            raise ValueError("WebSearchTool requires at least one backend.")
 
     # ── Async surface ───────────────────────────────────────────────
 
@@ -89,9 +98,41 @@ class WebSearchTool(Tool):
         except ValueError as exc:
             return f"[WebSearchTool] {exc}"
 
+        if self._backends is not None:
+            return await self._run_backends(queries)
         # Wrap the entire batch (including its 0.5s inter-query sleeps) in a
         # single to_thread worker so we don't fan out N blocking workers.
         return await asyncio.to_thread(self._run_sync, queries)
+
+    async def _run_backends(self, queries: list[str]) -> str:
+        """Fan out each query across all backends, then merge/format as usual."""
+        all_candidates: list[dict] = []
+        failures: list[str] = []
+        for idx, q in enumerate(queries):
+            results = await asyncio.gather(
+                *(b.search(q, self._max_results_per_query) for b in self._backends),
+                return_exceptions=True,
+            )
+            got_any = False
+            for backend, res in zip(self._backends, results):
+                if isinstance(res, Exception):
+                    failures.append(
+                        f"{self._query_label(idx)} [{backend.name}] failed with "
+                        f"{type(res).__name__}: {res}. Query: {q}"
+                    )
+                    continue
+                if res:
+                    got_any = True
+                    all_candidates.extend(self._extract_candidates(q, idx, {"items": res}))
+            if not got_any:
+                failures.append(f"{self._query_label(idx)} returned no results. Query: {q}")
+
+        if not all_candidates and failures:
+            return "\n".join(failures)
+        if not all_candidates:
+            return "No results found. Try a more specific or alternative query."
+        merged = self._merge_candidates(all_candidates)
+        return self._format_results(queries, merged, failures)
 
     # ── Sync core (runs in a worker thread) ─────────────────────────
 

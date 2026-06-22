@@ -25,6 +25,7 @@ def build_coordinator_system_prompt(config: CoordinatorConfig) -> str:
         _executor_section(),
         _decision_section(config),
         _environment_section(config),
+        _grounded_ideation_section(config),
         _related_work_annotation_section(config),
         _ask_user_section(config),
     ]
@@ -626,6 +627,55 @@ def _environment_section(config: CoordinatorConfig) -> str:
 # ---------------------------------------------------------------------------
 # Section 8: Related-work annotation (only when web tools enabled)
 # ---------------------------------------------------------------------------
+
+def _grounded_ideation_section(config: CoordinatorConfig) -> str:
+    sc = getattr(config, "search", None)
+    if sc is None or not sc.enabled or not sc.has_backend or not sc.grounded_ideation:
+        return ""
+    return """\
+# Research Search (optional external-knowledge tool)
+
+You have a `ResearchSearch` tool: an on-demand assistant that searches external
+sources (web + alphaXiv) and returns what it found. It runs in an **isolated
+context** (verbose SERP / page text never enters yours), **blocks**, and
+returns a digest: summary + findings + numbered sources.
+
+It is an **optional input, not a required step.** Ideas can come from
+experiment results, your own reasoning, or the literature — in any combination.
+Reach for `ResearchSearch` only when EXTERNAL knowledge would actually help.
+
+## Intents
+Set `intent` to shape the search (or omit it to let the assistant infer):
+- `related_work` — you have a draft idea; find and assess prior work (what
+  overlaps, what differs, whether there is a gap). Pass the idea as `context`.
+- `survey` — organize how a field/problem is currently solved (the main
+  approaches and their trade-offs).
+- `lookup` — answer a specific factual question (a method detail, a dataset, a
+  benchmark number, an API).
+- `explore` — open-ended scan of a direction for gaps / open problems.
+
+## How to use what it returns
+- The digest is **knowledge, not an idea.** Combine it with experiment results
+  and your own reasoning to decide what to try; do not copy a paper's
+  contribution wholesale.
+- When a returned source genuinely shaped an idea, record the citation when you
+  commit the node: `TreeAddNode(parent_id=..., hypothesis=...,
+  grounding="<the relevant source(s) from the digest>")`. This lands on the
+  node's `grounding` field.
+
+## Separation from the novelty audit
+`ResearchSearch` is a **separate lane** from `SearchIdeaContext` (the
+post-experiment novelty audit). They do not share state: research informs your
+work up-front (`node.grounding`); the novelty audit later runs its OWN fresh
+search to certify prior art (`node.related_work`). A `ResearchSearch` digest is
+NOT a novelty verdict.
+
+## When NOT to use
+- Questions you can answer from the codebase — use Read / Grep / Bash.
+- Things you already know well enough to act on.
+- A failed/empty digest (`[research-failed: ...]`) is no information — proceed
+  on your own judgment; it never blocks you."""
+
 
 def _related_work_annotation_section(config: CoordinatorConfig) -> str:
     sc = getattr(config, "search", None)

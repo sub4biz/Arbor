@@ -260,6 +260,12 @@ class _WebSearchEnv(BaseSettings):
     web_browse_endpoint: str | None = None
     web_search_api_key: str | None = None
     web_browse_api_key: str | None = None
+    serper_api_key: str | None = None  # SERPER_API_KEY
+    exa_api_key: str | None = None     # EXA_API_KEY
+    jina_api_key: str | None = None    # JINA_API_KEY
+    serper_api_key: str | None = None
+    exa_api_key: str | None = None
+    jina_api_key: str | None = None
 
 
 class SearchConfig(BaseModel):
@@ -320,16 +326,46 @@ class SearchConfig(BaseModel):
     #     coordinator (Phase-1 surface). Useful for debugging the raw tools or
     #     when you want full coordinator control of the loop.
     mode: str = "executor"
+    # Grounded ideation. When True, the coordinator gets a ``ResearchSearch``
+    # tool: an on-demand external-knowledge assistant (web + alphaXiv) it can
+    # call at any time to find related work, survey a field, look up a fact, or
+    # explore a direction. Default OFF — benchmark runs stay fair (the system
+    # cannot crib finished work off the web). This is a SEPARATE lane from the
+    # post-experiment novelty audit: a research digest enters the coordinator
+    # context and the citation that shaped an idea lands in ``node.grounding``,
+    # while the novelty audit still runs its own fresh search and writes
+    # ``node.related_work`` — the two never share state. Independent of
+    # ``mode``. Requires a configured backend.
+    grounded_ideation: bool = False
+    # ── Pluggable search backends ──────────────────────────────────────────
+    # Ordered list of search backends to fan out across and merge. Names:
+    #   "alphaxiv" (keyless papers) | "jina" (keyless web) | "serper" (key) |
+    #   "exa" (key) | "endpoint" (self-hosted web_search_endpoint).
+    # When empty, the legacy fields below are mapped automatically:
+    #   builtin_backend="alphaxiv" → ["alphaxiv"]; web_search_endpoint set →
+    #   append "endpoint". Backends missing credentials are dropped.
+    backends: list[str] = PydField(default_factory=list)
+    serper_api_key: str | None = None  # SERPER_API_KEY
+    exa_api_key: str | None = None     # EXA_API_KEY (used by both "exa" REST and "exa-mcp")
+    jina_api_key: str | None = None    # JINA_API_KEY (optional; raises Jina rate limits)
+    # Override the Exa MCP server URL for the "exa-mcp" backend (default
+    # https://mcp.exa.ai/mcp). Auth uses exa_api_key via the x-api-key header.
+    exa_mcp_url: str | None = None
+    # Visit/click backend: "auto" picks per config (browse endpoint → that;
+    # alphaXiv-only → alphaXiv SDK; else keyless Jina). Force one with
+    # "jina" | "requests" | "alphaxiv" | "endpoint".
+    visit_backend: str = "auto"
 
     @property
     def has_backend(self) -> bool:
-        """True when a search backend is available — either a self-hosted HTTP
-        endpoint or the built-in alphaXiv backend."""
-        return bool(self.web_search_endpoint) or self.builtin_backend == "alphaxiv"
+        """True when at least one usable search backend resolves from this config
+        (explicit ``backends`` list or the legacy endpoint / alphaXiv fields)."""
+        from ..core.tools.web.backends import resolve_backend_names
+        return bool(resolve_backend_names(self))
 
     @model_validator(mode="after")
     def _apply_env_fallbacks(self) -> "SearchConfig":
-        """Fill unset endpoints/keys from WEB_* env vars (pydantic-settings)."""
+        """Fill unset endpoints/keys from env vars (pydantic-settings)."""
         env = _WebSearchEnv()
         if self.web_search_endpoint is None:
             self.web_search_endpoint = env.web_search_endpoint or None
@@ -339,6 +375,12 @@ class SearchConfig(BaseModel):
             self.web_search_api_key = env.web_search_api_key or None
         if self.web_browse_api_key is None:
             self.web_browse_api_key = env.web_browse_api_key or self.web_search_api_key
+        if self.serper_api_key is None:
+            self.serper_api_key = env.serper_api_key or None
+        if self.exa_api_key is None:
+            self.exa_api_key = env.exa_api_key or None
+        if self.jina_api_key is None:
+            self.jina_api_key = env.jina_api_key or None
         return self
 
 

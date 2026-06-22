@@ -190,22 +190,29 @@ ui:
   interaction_mode: auto         # auto | direction | review | collaborative
   webui_port: 8765               # 只读浏览器监控
 
-# ── 文献检索 / 新颖性审查 ──────────────────────────────
+# ── 文献检索 / 外部知识 ────────────────────────────────
 search:
   enabled: true
-  builtin_backend: alphaxiv      # none | alphaxiv（零配置公共 API）
+  backends: [alphaxiv, jina]     # 有序；多后端结果合并去重（见下）
+  grounded_ideation: false       # 让 coordinator 在 ideation 阶段联网检索
   auto_search_on_add: false      # 每个新想法在运行前先做新颖性审查
 ```
 
-!!! tip "内置文献检索"
-    设 `search.builtin_backend: alphaxiv`，即可让 Arbor 通过 [alphaXiv](https://www.alphaxiv.org)
-    公共 API 调研相关工作——无需搜索端点或 API 密钥。该后端（`alphaxiv-py`）在
-    **Python ≥ 3.12** 上随 Arbor 默认内置；在 3.10/3.11 上不可用。
+#### 外部知识与检索 {#search}
 
-    开启 `auto_search_on_add: true` 后，加入树的每个想法都会先做一次**实验前**新颖性审查，
-    判定结果写入该节点的 `related_work` 字段（仅作建议，绝不阻断）。若想在运行之外单独审查一个
-    想法，使用 [`arbor idea-check`](cli.zh.md#arbor-idea-check)。自建后端的 BYO 方式
-    （`search.web_search_endpoint`）仍然可用，以接入自托管的 BrowseComp 风格后端。
+!!! tip "检索后端与接地 ideation"
+    Arbor 能在两条互相独立、默认关闭的 lane 中使用文献与开放网络——**接地 ideation**
+    （ideation *期间*检索 → `node.grounding`）与**新颖性审查**（实验*之后*核查先行工作 →
+    `node.related_work`）。`search.backends` 是一个有序、合并的来源列表；免 key 默认是
+    `[alphaxiv, jina]`（论文 + 通用网页，零配置），`serper` / `exa` / `exa-mcp` 在各自的
+    API key 后可用。读取页面同样免 key（`visit_backend: auto`，经 Jina reader）。完整后端表格、
+    intent、key 与示例见 **[检索与外部知识](search.zh.md)** 指南。
+
+    关键字段：`backends`、`grounded_ideation`、`auto_search_on_add`、`visit_backend`、
+    `serper_api_key` / `exa_api_key` / `jina_api_key`、`exa_mcp_url`。旧的
+    `builtin_backend` / `web_search_endpoint` 仍可用。
+
+
 
 !!! note "扁平键也可以"
     嵌套分组（`llm:`、`timeout:`、`ui:`）是推荐风格，但等价的扁平键也被接受。带注解的参考见仓库里的

@@ -223,25 +223,32 @@ ui:
   interaction_mode: auto         # auto | direction | review | collaborative
   webui_port: 8765               # read-only browser monitor
 
-# ── Literature search / novelty checks ────────────────
+# ── Literature search / external knowledge ────────────
 search:
   enabled: true
-  builtin_backend: alphaxiv      # none | alphaxiv (zero-config public API)
+  backends: [alphaxiv, jina]     # ordered; fanned out & merged (see below)
+  grounded_ideation: false       # let the coordinator search during ideation
   auto_search_on_add: false      # novelty-check every new idea before running it
 ```
 
-!!! tip "Built-in literature search"
-    Set `search.builtin_backend: alphaxiv` to let Arbor survey related work over
-    the public [alphaXiv](https://www.alphaxiv.org) API — no search endpoint or
-    API key needed. The backend (`alphaxiv-py`) ships with Arbor by default on
-    **Python ≥ 3.12**; on 3.10/3.11 it is unavailable.
+#### External knowledge & search {#search}
 
-    With `auto_search_on_add: true`, every idea added to the tree gets a
-    **pre-experiment** novelty check whose verdict lands in the node's
-    `related_work` field (advisory, never blocking). For a one-off check
-    outside a run, use [`arbor idea-check`](cli.md#arbor-idea-check). The legacy
-    bring-your-own setup (`search.web_search_endpoint`) still works for
-    self-hosted BrowseComp-style backends.
+!!! tip "Search backends and grounded ideation"
+    Arbor can use literature and the open web in two independent, default-off
+    lanes — **grounded ideation** (search *during* ideation → `node.grounding`)
+    and the **novelty audit** (prior-art check *after* an experiment →
+    `node.related_work`). `search.backends` is an ordered, merged list of
+    sources; the keyless default is `[alphaxiv, jina]` (papers + general web,
+    no setup), with `serper` / `exa` / `exa-mcp` available behind their API
+    keys. Page reading is keyless too (`visit_backend: auto`, via the Jina
+    reader). See the **[Search & External Knowledge](search.md)** guide for the
+    full backend table, intents, keys, and examples.
+
+    Key fields: `backends`, `grounded_ideation`, `auto_search_on_add`,
+    `visit_backend`, `serper_api_key` / `exa_api_key` / `jina_api_key`,
+    `exa_mcp_url`. Legacy `builtin_backend` / `web_search_endpoint` still work.
+
+
 
 !!! note "Flat keys also work"
     The nested groups (`llm:`, `timeout:`, `ui:`) are the recommended style, but equivalent

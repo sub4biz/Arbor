@@ -120,6 +120,17 @@ class TreeAddNodeTool(Tool):
                     "implementation decisions."
                 ),
             },
+            "grounding": {
+                "type": "string",
+                "description": (
+                    "Optional. When a ResearchSearch result shaped this idea, "
+                    "record the source citation(s) here (Markdown, e.g. the "
+                    "relevant links from the digest). Stored on the node's "
+                    "`grounding` field — separate from the post-experiment "
+                    "`related_work` novelty audit. Leave empty for ideas not "
+                    "derived from an external search."
+                ),
+            },
         },
         "required": ["parent_id", "hypothesis"],
     }
@@ -151,6 +162,7 @@ class TreeAddNodeTool(Tool):
 
         parent_id: str = kwargs["parent_id"]
         hypothesis: str = kwargs["hypothesis"]
+        grounding: str = (kwargs.get("grounding") or "").strip()
 
         parent = self._tree.get_node(parent_id)
         if parent is None:
@@ -178,6 +190,7 @@ class TreeAddNodeTool(Tool):
             parent_id=parent_id,
             depth=new_depth,
             hypothesis=hypothesis,
+            grounding=grounding,
         )
         self._tree.add_node(node)
 

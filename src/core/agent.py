@@ -207,6 +207,13 @@ class Agent:
         self.system_prompt = system_prompt
         self.config = config
         self.messages: list[dict[str, Any]] = []
+        # Normalized, provider-agnostic transcript of what the model produced,
+        # so callers can recover the last good output even when run() returns a
+        # placeholder (max_turns) or is cancelled by a timeout. `messages`
+        # stores provider-specific raw_content; these two store the normalized
+        # views (plain text and {name,input} tool calls).
+        self.assistant_texts: list[str] = []
+        self.tool_uses: list[dict[str, Any]] = []
         self.total_turns = 0
         # Why the loop exited, surfaced to callers alongside total_turns:
         #   "finished"  — model produced a final answer with no tool calls
@@ -384,9 +391,12 @@ class Agent:
             text = response.get_text()
             if text:
                 _print_assistant(text)
+                self.assistant_texts.append(text)
 
             # 6. Check tool calls
             tool_calls = response.get_tool_calls()
+            for _tc in tool_calls:
+                self.tool_uses.append({"name": _tc.name, "input": _tc.input})
             if not tool_calls:
                 if (
                     no_tool_nudges < 3

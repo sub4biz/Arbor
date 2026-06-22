@@ -54,6 +54,31 @@ def _paper_id(url: str) -> str | None:
     return m.group(1) if m else None
 
 
+def papers_to_items(papers: Any) -> list[dict]:
+    """Map alphaXiv paper objects onto the WebSearchTool item contract
+    ``{url, title, snippets}``. Shared by AlphaXivSearchTool and AlphaXivBackend."""
+    items: list[dict] = []
+    for r in papers or []:
+        pid = getattr(r, "canonical_id", None) or getattr(
+            r, "universal_paper_id", None
+        )
+        if not pid:
+            continue
+        title = (getattr(r, "title", None) or "No Title").strip()
+        abstract = (getattr(r, "abstract", None) or "").strip()
+        authors = getattr(r, "authors", None) or []
+        names = ", ".join(
+            getattr(a, "display_name", "") for a in authors
+        ).strip(", ")
+        date = getattr(r, "publication_date", None) or ""
+        prefix = " · ".join(p for p in (names, str(date)) if p)
+        snippet = f"{prefix} — {abstract}" if prefix else abstract
+        items.append(
+            {"url": _ABS_URL.format(pid), "title": title, "snippets": snippet}
+        )
+    return items
+
+
 class AlphaXivSearchTool(WebSearchTool):
     """``web_search`` backed by the public alphaXiv paper search."""
 
@@ -118,26 +143,7 @@ class AlphaXivSearchTool(WebSearchTool):
     def _papers_to_items(self, papers: Any) -> list[dict]:
         """Map alphaXiv paper objects onto the WebSearchTool item contract
         ``{url, title, snippets}``."""
-        items: list[dict] = []
-        for r in papers or []:
-            pid = getattr(r, "canonical_id", None) or getattr(
-                r, "universal_paper_id", None
-            )
-            if not pid:
-                continue
-            title = (getattr(r, "title", None) or "No Title").strip()
-            abstract = (getattr(r, "abstract", None) or "").strip()
-            authors = getattr(r, "authors", None) or []
-            names = ", ".join(
-                getattr(a, "display_name", "") for a in authors
-            ).strip(", ")
-            date = getattr(r, "publication_date", None) or ""
-            prefix = " · ".join(p for p in (names, str(date)) if p)
-            snippet = f"{prefix} — {abstract}" if prefix else abstract
-            items.append(
-                {"url": _ABS_URL.format(pid), "title": title, "snippets": snippet}
-            )
-        return items
+        return papers_to_items(papers)
 
 
 class AlphaXivVisitTool(WebVisitTool):

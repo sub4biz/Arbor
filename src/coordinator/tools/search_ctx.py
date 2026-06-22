@@ -159,57 +159,9 @@ async def wait_for_pending_searches(timeout: float | None = None) -> int:
 # JSON extraction
 # ---------------------------------------------------------------------------
 
-def _extract_json_block(text: str) -> dict[str, Any] | None:
-    """Pull the first balanced JSON object out of ``text``.
-
-    Mirrors the *pattern* of ``_parse_executor_report`` (try direct
-    ``json.loads`` first, then a permissive extraction) but uses a different
-    schema, so we don't share the helper.
-    """
-    if not text:
-        return None
-    s = text.strip()
-    if s.startswith("```"):
-        s = s.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-    try:
-        obj = json.loads(s)
-        if isinstance(obj, dict):
-            return obj
-    except json.JSONDecodeError:
-        pass
-
-    # Try to find the largest balanced { ... } block.
-    starts = [i for i, ch in enumerate(text) if ch == "{"]
-    for start in starts:
-        depth = 0
-        in_str = False
-        escape = False
-        for i in range(start, len(text)):
-            ch = text[i]
-            if escape:
-                escape = False
-                continue
-            if ch == "\\":
-                escape = True
-                continue
-            if ch == '"':
-                in_str = not in_str
-                continue
-            if in_str:
-                continue
-            if ch == "{":
-                depth += 1
-            elif ch == "}":
-                depth -= 1
-                if depth == 0:
-                    chunk = text[start : i + 1]
-                    try:
-                        obj = json.loads(chunk)
-                        if isinstance(obj, dict):
-                            return obj
-                    except json.JSONDecodeError:
-                        break
-    return None
+# Moved to _agent_recover (shared with the research lane). Re-exported here so
+# existing importers (e.g. cli/commands/idea_check_cmd.py) keep working.
+from ._agent_recover import _extract_json_block, recover_json  # noqa: E402,F401
 
 
 def _render_markdown(parsed: dict[str, Any]) -> str:
@@ -307,6 +259,7 @@ async def _run_one(
     )
 
     raw = ""
+    agent = None
     try:
         agent = build_search_agent(
             provider=provider,
@@ -326,17 +279,24 @@ async def _run_one(
                 timeout=sc.agent_timeout,
             )
     except asyncio.TimeoutError:
-        marker = f"[search-failed: timed out after {sc.agent_timeout}s]"
-        await tree.async_update_node(node_id, related_work=marker)
-        log.warning("SearchAgent for %s timed out", node_id)
-        return f"{node_id}: {marker}"
+        # The agent may have emitted a valid final JSON before the deadline;
+        # recover it from the transcript instead of discarding the work.
+        recovered = recover_json(agent, "") if agent is not None else None
+        if recovered is None:
+            marker = f"[search-failed: timed out after {sc.agent_timeout}s]"
+            await tree.async_update_node(node_id, related_work=marker)
+            log.warning("SearchAgent for %s timed out", node_id)
+            return f"{node_id}: {marker}"
+        log.info("SearchAgent for %s timed out but a final JSON was recovered", node_id)
+        parsed = recovered
     except Exception as exc:  # noqa: BLE001
         marker = f"[search-failed: {type(exc).__name__}: {exc}]"
         await tree.async_update_node(node_id, related_work=marker)
         log.warning("SearchAgent for %s failed: %s", node_id, exc)
         return f"{node_id}: {marker}"
+    else:
+        parsed = recover_json(agent, raw)
 
-    parsed = _extract_json_block(raw)
     if parsed is None:
         # Fallback: store the raw assistant text with an [unparsed] tag.
         snippet = raw.strip()

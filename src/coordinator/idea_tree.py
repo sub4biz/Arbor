@@ -42,6 +42,7 @@ class Node:
     score: float | None = None  # Absolute score (e.g. 45.2%)
     code_ref: str | None = None  # Git branch name
     related_work: str = ""  # SearchAgent / web-search annotation (Markdown)
+    grounding: str = ""  # grounding-lane citations that shaped this idea (Markdown)
 
     # Outcome metadata (set when an executor finishes). eval_status classifies
     # why there is/isn't a score; stop_reason mirrors Agent.stop_reason; attempt
@@ -60,6 +61,7 @@ class Node:
         "score",
         "code_ref",
         "related_work",
+        "grounding",
         "eval_status",
         "stop_reason",
         "attempt",
@@ -84,6 +86,8 @@ class Node:
             d["code_ref"] = self.code_ref
         if self.related_work:
             d["related_work"] = self.related_work
+        if self.grounding:
+            d["grounding"] = self.grounding
         if self.eval_status:
             d["eval_status"] = self.eval_status
         if self.stop_reason:
@@ -106,6 +110,7 @@ class Node:
             score=data.get("score", data.get("score_delta")),  # backward compat
             code_ref=data.get("code_ref"),
             related_work=data.get("related_work", ""),
+            grounding=data.get("grounding", ""),
             eval_status=data.get("eval_status"),
             stop_reason=data.get("stop_reason"),
             attempt=data.get("attempt", 1),
@@ -528,6 +533,8 @@ class IdeaTree:
             lines.append(f"**Insight**: {node.insight}\n")
         if node.related_work:
             lines.append(f"**Related work**:\n\n{node.related_work}\n")
+        if node.grounding:
+            lines.append(f"**Grounding**:\n\n{node.grounding}\n")
         if node.result:
             lines.append(f"**Result**: {node.result}\n")
         if node.code_ref:
@@ -547,6 +554,8 @@ class IdeaTree:
             lines.append(f"  Insight: {node.insight}")
         if node.related_work:
             lines.append(f"  Related work: {node.related_work}")
+        if node.grounding:
+            lines.append(f"  Grounding: {node.grounding}")
         if node.result:
             lines.append(f"  Result: {node.result}")
         if node.score is not None:

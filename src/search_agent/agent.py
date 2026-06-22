@@ -6,12 +6,6 @@ from typing import Any, TYPE_CHECKING
 
 from ..core.agent import Agent
 from ..core.config import AgentConfig
-from ..core.tools.web import (
-    AlphaXivSearchTool,
-    AlphaXivVisitTool,
-    WebSearchTool,
-    WebVisitTool,
-)
 from .prompts import SEARCH_AGENT_SYSTEM_PROMPT
 
 if TYPE_CHECKING:
@@ -69,6 +63,7 @@ def build_search_agent(
     event_bus: Any | None = None,
     max_tokens: int = 8192,
     context_window: int = 200_000,
+    system_prompt: str | None = None,
 ) -> Agent:
     """Construct a SearchAgent.
 
@@ -86,6 +81,10 @@ def build_search_agent(
     meta_config:
         Optional ``CoordinatorConfig`` — only consulted if a model override is
         configured and a fresh provider needs to be built.
+    system_prompt:
+        Optional system-prompt override. Defaults to the novelty-scout prompt
+        (``SEARCH_AGENT_SYSTEM_PROMPT``). The grounded-ideation lane passes the
+        grounding-scout prompt here to reuse the same backend wiring.
     """
     if not search_config.has_backend:
         raise ValueError(
@@ -123,38 +122,25 @@ def build_search_agent(
         agent_config.llm_retry_base_delay = meta_config.llm_retry_base_delay
         agent_config.llm_retry_max_delay = meta_config.llm_retry_max_delay
 
-    if search_config.builtin_backend == "alphaxiv":
-        # Zero-config alphaXiv backend — no endpoint URL needed.
-        tools: list = [
-            AlphaXivSearchTool(cwd=cwd),
-            AlphaXivVisitTool(
-                cwd=cwd,
-                max_content_tokens=search_config.visit_max_content_tokens,
-            ),
-        ]
-    else:
-        tools = [
-            WebSearchTool(
-                cwd=cwd,
-                endpoint_url=search_config.web_search_endpoint,
-                provider=search_config.web_search_provider,
-                api_key=search_config.web_search_api_key,
-            ),
-        ]
-        if search_config.web_browse_endpoint:
-            tools.append(
-                WebVisitTool(
-                    cwd=cwd,
-                    endpoint_url=search_config.web_browse_endpoint,
-                    max_content_tokens=search_config.visit_max_content_tokens,
-                    api_key=search_config.web_browse_api_key,
-                )
-            )
+    # Backend selection (alphaXiv / Jina / Serper / Exa / endpoint search +
+    # keyless or endpoint visit) is centralized in the web-tools factory.
+    from ..core.tools.web.factory import (
+        build_web_search_tool,
+        build_web_visit_tool,
+    )
+
+    tools: list = []
+    search_tool = build_web_search_tool(search_config, cwd=cwd)
+    if search_tool is not None:
+        tools.append(search_tool)
+    visit_tool = build_web_visit_tool(search_config, cwd=cwd)
+    if visit_tool is not None:
+        tools.append(visit_tool)
 
     agent = Agent(
         provider=provider,
         tools=tools,
-        system_prompt=SEARCH_AGENT_SYSTEM_PROMPT,
+        system_prompt=system_prompt or SEARCH_AGENT_SYSTEM_PROMPT,
         config=agent_config,
     )
     # SearchAgent never touches git.
