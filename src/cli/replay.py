@@ -280,6 +280,9 @@ def demo_recording() -> Recording:
         )
     rec = load_recording(DEMO_DIR)
     rec.run_name = "demo"
+    # The recording lives inside the package; don't let `--html` default to
+    # writing artifacts back into it. A demo export lands in the cwd instead.
+    rec.session_dir = None
     return rec
 
 

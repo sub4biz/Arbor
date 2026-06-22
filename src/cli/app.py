@@ -46,11 +46,18 @@ app.add_typer(config_app, name="config")
 @app.command("version")
 def version_command() -> None:
     """Print the installed version."""
-    try:
-        from importlib.metadata import version as _v
-        ver = _v(APP_NAME)
-    except Exception:
-        ver = "unknown"
+    from importlib.metadata import version as _v
+
+    # The installed distribution is "arbor-agent"; APP_NAME ("arbor") is the
+    # command/brand, not the package name, so look up the dist explicitly (with
+    # a fallback in case it's ever renamed back).
+    ver = "unknown"
+    for dist in ("arbor-agent", APP_NAME):
+        try:
+            ver = _v(dist)
+            break
+        except Exception:
+            continue
     typer.echo(f"{APP_NAME} {ver}")
 
 
