@@ -79,7 +79,7 @@ arbor idea-check "一句话描述你的假设"
 | `jina` | 否（可选 `JINA_API_KEY` 提配额） | 通用网页（s.jina.ai） |
 | `serper` | `SERPER_API_KEY` | Google 结果（serper.dev） |
 | `exa` | `EXA_API_KEY` | 神经网络检索（exa.ai REST） |
-| `exa-mcp` | `EXA_API_KEY` | 经 Exa 托管 MCP 服务器接入 |
+| `exa-mcp` | 否（可选 `EXA_API_KEY` 提配额） | 经 Exa 托管 MCP 服务器接入 |
 | `endpoint` | 可选 | 自托管 `web_search_endpoint`（BrowseComp 风格） |
 
 缺少 key 的后端会被**静默跳过**——因此像 `[alphaxiv, jina, serper]` 这样的列表在没有 `SERPER_API_KEY`
@@ -89,9 +89,10 @@ key 写在配置文件里（`serper_api_key` / `exa_api_key` / `jina_api_key`）
 （`SERPER_API_KEY`、`EXA_API_KEY`、`JINA_API_KEY`）。
 
 !!! note "Exa via MCP"
-    `exa-mcp` 后端连接 Exa 托管的 MCP 服务器（`https://mcp.exa.ai/mcp`，用 `x-api-key` header 鉴权；
-    可用 `exa_mcp_url` 覆盖 URL）。它需要可选的 MCP 客户端：`pip install 'arbor-agent[mcp]'`。
-    而普通的 `exa` 后端走同一家的 REST API、无需额外依赖——按你的环境二选一即可。
+    `exa-mcp` 后端连接 Exa 托管的 MCP 服务器（`https://mcp.exa.ai/mcp`，可用 `exa_mcp_url` 覆盖 URL）。
+    托管服务器**免 key** 即可基本使用——设 `exa_api_key` 只是提配额（作为 `x-api-key` header 发送）。
+    它需要 MCP 客户端：`pip install 'arbor-agent[mcp]'`。而普通的 `exa` 后端走同一家的 REST API
+    （那个**需要** key）——按你的环境二选一。
 
 ---
 
@@ -101,9 +102,15 @@ key 写在配置文件里（`serper_api_key` / `exa_api_key` / `jina_api_key`）
 
 - alphaXiv 论文 URL → alphaXiv SDK（全文），
 - 其它任意 URL → **Jina reader**（`r.jina.ai`，干净 markdown，免 key），再 fallback 到原始 `requests` 抓取。
+  **PDF 也能读**——Jina reader 会抽取 PDF 文本，raw fallback 用 `pypdf` 解析 PDF。
 
 因此打开页面无需 browse 端点或 API key。也可强制单一取页器：
 `visit_backend: jina | requests | alphaxiv | endpoint`。
+
+**阅读深度（全文 vs 摘要）。** 页面文本会按 token 预算截断。新颖性审查 lane 用
+`visit_max_content_tokens`（默认 2048——判断先行工作有摘要就够）。接地 ideation lane 要读深度，
+用更大的 `research_visit_tokens`（默认 6000），让论文的**方法 / 结果章节不被截断**，而不只是摘要。
+需要更深可调大任一项（token 成本更高）。
 
 ---
 
