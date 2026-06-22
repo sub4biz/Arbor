@@ -158,13 +158,25 @@ via the **Docs** badge above.
 
 ## ⚡ Getting Started
 
+**See it work first — no API key, no config:**
+
 ```bash
-arbor setup       # one-time: configure provider / model / base_url / API key
-arbor             # start an interactive session in the current directory
-arbor doctor      # diagnose the install
+arbor replay --demo   # watch a recorded run: the hypothesis tree grows live
 ```
 
-`arbor setup` writes `~/.arbor/config.yaml`, so day-to-day you can just run `arbor`
+> Want a shareable version? `arbor replay --demo --html` writes a self-contained
+> interactive page (no server, no deps) you can open in a browser or attach anywhere.
+
+**Then run it on your own task:**
+
+```bash
+arbor quickstart  # ~2 min: a free key (Gemini/Groq) or a local model (Ollama)
+arbor             # start an interactive session in the current directory
+```
+
+Already have a provider? `arbor setup` runs the full provider / model / base_url / API key
+flow; `arbor doctor` diagnoses the install. Both `quickstart` and `setup` write
+`~/.arbor/config.yaml`, so day-to-day you can just run `arbor`
 with no flags. The first thing Arbor does is an **intake conversation** that turns your
 goal, target directory, metric, baseline, budget, dev/test discipline, and artifact
 paths into a one-screen **Arbor Research Contract**. Once you confirm it, the live
@@ -324,6 +336,9 @@ Day to day you only need `arbor`:
 | Command | What it does |
 | --- | --- |
 | `arbor` | Start an interactive research session. |
+| `arbor replay --demo` | Replay a bundled sample run in the live dashboard — no API key needed. Add `--html` for a shareable browser page. |
+| `arbor replay <session>` | Replay any past run's `events.jsonl` from its timeline (`--html` to export an interactive page). |
+| `arbor quickstart` | Get running fast with a free key (Gemini/Groq) or a local model (Ollama). |
 | `arbor setup` | Configure provider / model / keys → `~/.arbor/config.yaml`. |
 | `arbor report <session>` | Re-render `REPORT.md` for a past session. |
 | `arbor export <session> [output]` | Export a past session to self-contained HTML, or JSONL when `output` ends in `.jsonl`. |

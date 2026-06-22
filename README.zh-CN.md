@@ -111,13 +111,25 @@ arbor doctor
 
 ## ⚡ 快速开始
 
+**先看它跑起来 —— 无需 API 密钥、无需配置：**
+
 ```bash
-arbor setup       # 首次使用：配置模型提供商 / 模型 / base_url / API 密钥
-arbor             # 在当前目录启动交互式会话
-arbor doctor      # 诊断安装状态
+arbor replay --demo   # 回放一次录制好的运行：假设树在眼前生长
 ```
 
-`arbor setup` 会将配置写入 `~/.arbor/config.yaml`，此后日常使用直接运行 `arbor` 即可，无需额外参数。Arbor 启动后首先进行一次**任务摄入对话**，将你的目标、目标目录、评估指标、基线、预算、开发/测试纪律和产物路径整理成一份简洁的 **Arbor 研究合同**。确认后，实时仪表盘随即接管。
+> 想要可分享的版本？`arbor replay --demo --html` 会生成一个自包含的交互式页面
+> （无需服务器、无外部依赖），可在浏览器打开或附到任意地方。
+
+**然后在你自己的任务上运行：**
+
+```bash
+arbor quickstart  # 约 2 分钟：免费密钥（Gemini/Groq）或本地模型（Ollama）
+arbor             # 在当前目录启动交互式会话
+```
+
+已有模型提供商？`arbor setup` 提供完整的 提供商 / 模型 / base_url / API 密钥 配置流程；
+`arbor doctor` 用于诊断安装。`quickstart` 与 `setup` 都会将配置写入
+`~/.arbor/config.yaml`，此后日常使用直接运行 `arbor` 即可，无需额外参数。Arbor 启动后首先进行一次**任务摄入对话**，将你的目标、目标目录、评估指标、基线、预算、开发/测试纪律和产物路径整理成一份简洁的 **Arbor 研究合同**。确认后，实时仪表盘随即接管。
 
 ```bash
 # 指定基准目录和配置文件
@@ -256,6 +268,9 @@ ROOT（基线：20%）
 | 命令                     | 功能                                                        |
 | ------------------------ | ----------------------------------------------------------- |
 | `arbor`                  | 启动交互式研究会话。                                        |
+| `arbor replay --demo`    | 在实时仪表盘里回放一次内置示例运行 —— 无需 API 密钥；加 `--html` 生成可分享的网页。 |
+| `arbor replay <session>` | 按时间轴回放任意历史运行的 `events.jsonl`（`--html` 可导出交互式页面）。 |
+| `arbor quickstart`       | 用免费密钥（Gemini/Groq）或本地模型（Ollama）快速跑起来。   |
 | `arbor setup`            | 配置模型提供商 / 模型 / API 密钥 → `~/.arbor/config.yaml`。 |
 | `arbor report <session>` | 重新渲染某次历史会话的 `REPORT.md`。                        |
 | `arbor export <session> [output]` | 将历史会话导出为自包含 HTML；当 `output` 以 `.jsonl` 结尾时导出 JSONL。 |
