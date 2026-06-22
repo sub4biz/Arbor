@@ -32,15 +32,17 @@ __all__ = [
 def resolve_backend(provider: str | None, openai_api: str | None, model: str | None, base_url: str | None) -> str:
     """Collapse the (provider, openai_api) config onto one backend id.
 
-    Returns one of: ``anthropic`` | ``openai-oauth`` | ``openai-responses`` |
-    ``openai-chat`` | ``litellm``. ``provider="auto"`` (the default) routes by
-    model name:
+    Returns one of: ``anthropic`` | ``anthropic-oauth`` | ``openai-oauth`` |
+    ``openai-responses`` | ``openai-chat`` | ``litellm``. ``provider="auto"``
+    (the default) routes by model name:
     a ``claude*`` model on the default endpoint uses the native Anthropic
     backend (prompt caching); everything else uses litellm.
     """
     p = (provider or "auto").lower()
     if p in ("claude", "anthropic"):
         return "anthropic"
+    if p in ("anthropic-oauth", "claude-oauth", "claude-pro", "anthropic_oauth"):
+        return "anthropic-oauth"
     if p in ("openai-oauth", "chatgpt", "openai_oauth"):
         return "openai-oauth"
     if p in ("openai-responses", "responses"):
@@ -72,6 +74,15 @@ def create_provider(config: AgentConfig) -> LLMProvider:
             model=config.model,
             api_key=config.api_key,
             base_url=config.base_url,
+            max_retries=config.llm_provider_retries,
+            timeout=config.llm_timeout,
+            reasoning_effort=config.reasoning_effort,
+            thinking_budget_tokens=config.thinking_budget_tokens,
+        )
+    if backend == "anthropic-oauth":
+        from .llm.claude_oauth import ClaudeOAuthProvider
+        return ClaudeOAuthProvider(
+            model=config.model,
             max_retries=config.llm_provider_retries,
             timeout=config.llm_timeout,
             reasoning_effort=config.reasoning_effort,

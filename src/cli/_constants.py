@@ -12,12 +12,12 @@ from __future__ import annotations
 # display order. Each is a single-axis value that maps 1:1 onto a backend, so
 # the config file reads the same as the menu. `auto` resolves to one of the
 # concrete three at setup time.
-PROVIDER_CHOICES = ("auto", "openai-responses", "openai-chat", "openai-oauth", "anthropic")
+PROVIDER_CHOICES = ("auto", "openai-responses", "openai-chat", "openai-oauth", "anthropic", "anthropic-oauth")
 
 # Concrete providers Arbor can store + serve after `auto` is resolved. `litellm`
 # stays a valid backend for back-compat / advanced hand-edited configs, but is
 # no longer advertised in the menu.
-_BACKEND_PROVIDERS = {"anthropic", "openai-responses", "openai-chat", "openai-oauth", "litellm"}
+_BACKEND_PROVIDERS = {"anthropic", "anthropic-oauth", "openai-responses", "openai-chat", "openai-oauth", "litellm"}
 VALID_OPENAI_APIS = {"chat", "responses"}
 
 # Intake-agent LLM call budget — seeded into the agent config by ``run`` and
@@ -39,6 +39,9 @@ INTAKE_REASONING_EFFORT = "low"
 DEFAULT_OPENAI_MODEL = "gpt-4o"
 DEFAULT_OPENAI_OAUTH_MODEL = "gpt-5.5"
 DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-20250514"
+# The subscription (OAuth) backend exposes only current snapshots; the dated
+# API-key default above is retired there, so use a live one.
+DEFAULT_CLAUDE_OAUTH_MODEL = "claude-sonnet-4-5-20250929"
 
 # Read-only WebUI: the browser monitor binds here by default for interactive
 # runs (no flag needed). If the port is taken we walk the next few ports so a
@@ -61,6 +64,8 @@ def canonical_provider(provider: str | None, openai_api: str | None = None) -> s
         return "auto"
     if p in ("claude", "anthropic"):
         return "anthropic"
+    if p in ("anthropic-oauth", "claude-oauth", "claude-pro", "anthropic_oauth"):
+        return "anthropic-oauth"
     if p == "litellm":
         return "litellm"
     if p in ("openai-oauth", "chatgpt", "openai_oauth"):
@@ -84,6 +89,8 @@ def default_model_for_provider(provider: str | None) -> str | None:
     canon = canonical_provider(provider)
     if canon == "openai-oauth":
         return DEFAULT_OPENAI_OAUTH_MODEL
+    if canon == "anthropic-oauth":
+        return DEFAULT_CLAUDE_OAUTH_MODEL
     if canon.startswith("openai") or canon == "litellm":
         return DEFAULT_OPENAI_MODEL
     return None

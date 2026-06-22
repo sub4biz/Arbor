@@ -65,12 +65,16 @@ def run_setup_wizard(*, force: bool = False) -> bool:
             ("openai-chat", "any OpenAI-compatible endpoint (DeepSeek / Qwen / GLM / …)"),
             ("openai-oauth", "ChatGPT Plus/Pro subscription via browser login (experimental)"),
             ("anthropic", "Claude via the native Anthropic API"),
+            ("anthropic-oauth", "Claude Pro/Max subscription via browser login (experimental)"),
         ],
         default="auto",
     )
 
     if provider == "openai-oauth":
         return _setup_openai_oauth()
+
+    if provider == "anthropic-oauth":
+        return _setup_anthropic_oauth()
 
     # 2. base_url (local proxy / vLLM / official API)
     base_url = typer.prompt(
@@ -189,6 +193,39 @@ def _setup_openai_oauth() -> bool:
     _console.print()
     write_user_llm_config(
         {"provider": "openai-oauth", "model": model, "reasoning_effort": effort}
+    )
+    _console.print(
+        f"\n[green]Done.[/] Saved to [bold]{GLOBAL_CONFIG_FILE}[/]. "
+        "Just run [bold]arbor[/] to start a session.\n"
+    )
+    return True
+
+
+def _setup_anthropic_oauth() -> bool:
+    """Run the Claude subscription login, then write the global config."""
+    from ...core.oauth import anthropic as oauth
+    from .._constants import DEFAULT_CLAUDE_OAUTH_MODEL
+    from ..style import console as _console
+
+    _console.print()
+    _console.print(
+        "[yellow]Experimental:[/] using a Claude subscription token with "
+        "third-party tools may violate Anthropic's terms and risks your account."
+    )
+    try:
+        tokens = oauth.login()
+    except oauth.OAuthError as exc:
+        _console.print(f"[red]login failed:[/] {exc}")
+        return False
+
+    who = tokens.account_email or "signed in"
+    _console.print(f"[green]✓[/] signed in to Claude — [bold]{who}[/]")
+
+    model = typer.prompt("Model", default=DEFAULT_CLAUDE_OAUTH_MODEL).strip() or DEFAULT_CLAUDE_OAUTH_MODEL
+    effort = _prompt_reasoning_effort()
+    _console.print()
+    write_user_llm_config(
+        {"provider": "anthropic-oauth", "model": model, "reasoning_effort": effort}
     )
     _console.print(
         f"\n[green]Done.[/] Saved to [bold]{GLOBAL_CONFIG_FILE}[/]. "

@@ -173,6 +173,26 @@ three:
     get your account rate-limited or banned. This path is opt-in and unsupported — prefer a
     standard `OPENAI_API_KEY` for anything you care about.
 
+!!! warning "Experimental: Claude subscription login (`anthropic-oauth`)"
+    Claude Pro/Max subscribers can drive Arbor with their subscription instead of a
+    pay-per-token key. Run `arbor login claude` to sign in through the browser, then paste
+    the code the callback page shows; the token is stored in `~/.arbor/oauth/anthropic.json`
+    and refreshed automatically. This writes:
+
+    ```yaml
+    llm:
+      provider: anthropic-oauth
+      model: claude-sonnet-4-5-20250929
+    ```
+
+    Manage the session with `arbor login status` / `arbor login logout`. Requests go to the
+    Anthropic Messages API as a `Bearer` token (with the `anthropic-beta: oauth-2025-04-20`
+    header), **not** with an `x-api-key`.
+
+    Using a subscription token with third-party tooling may violate Anthropic's terms and can
+    get your account rate-limited or banned. This path is opt-in and unsupported — prefer a
+    standard `ANTHROPIC_API_KEY` for anything you care about.
+
 ### 3. Per-project: a config file
 
 When a project needs its own durable settings, drop a YAML file in it. Arbor auto-detects

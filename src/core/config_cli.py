@@ -44,7 +44,7 @@ class CLIField:
 # the groups they expose, so a shared field (e.g. --provider) is declared once.
 
 LLM_FLAGS: tuple[CLIField, ...] = (
-    CLIField("--provider", "provider", str, "Backend: auto (default) | anthropic | openai-responses | openai-chat | openai-oauth | litellm", choices=("auto", "anthropic", "claude", "openai", "openai-responses", "openai-chat", "openai-oauth", "litellm")),
+    CLIField("--provider", "provider", str, "Backend: auto (default) | anthropic | anthropic-oauth | openai-responses | openai-chat | openai-oauth | litellm", choices=("auto", "anthropic", "anthropic-oauth", "claude", "claude-oauth", "openai", "openai-responses", "openai-chat", "openai-oauth", "litellm")),
     CLIField("--model", "model", str, "Model name (default: claude-sonnet-4-20250514 / gpt-4o)"),
     CLIField("--api-key", "api_key", str, "API key (default: from env)"),
     CLIField("--base-url", "base_url", str, "Custom API base URL (vLLM, Ollama, proxy, ...)"),

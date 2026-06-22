@@ -120,6 +120,9 @@ class PreflightChecker:
         if self.provider == "openai-oauth":
             return self._check_openai_oauth()
 
+        if self.provider == "anthropic-oauth":
+            return self._check_anthropic_oauth()
+
         if self.provider not in self._PROVIDER_ENV:
             return CheckResult(
                 "llm", "fail",
@@ -178,6 +181,27 @@ class PreflightChecker:
         plan = tokens.plan_type or "unknown"
         return CheckResult("llm", "pass",
                            f"ChatGPT subscription token found (plan={plan})")
+
+    @staticmethod
+    def _check_anthropic_oauth() -> CheckResult:
+        """Claude subscription auth lives in a token file, not an env var."""
+        try:
+            from ..core.oauth import anthropic as oauth
+        except ImportError:
+            return CheckResult(
+                "llm", "fail", "claude oauth support unavailable",
+                hint="reinstall arbor",
+            )
+        tokens = oauth.load_tokens()
+        if tokens is None:
+            return CheckResult(
+                "llm", "fail",
+                "not logged in to Claude (provider=anthropic-oauth)",
+                hint="run `arbor login claude`",
+            )
+        who = tokens.account_email or "account"
+        return CheckResult("llm", "pass",
+                           f"Claude subscription token found ({who})")
 
     # ── Check 2: codebase ──────────────────────────────────────────
 
