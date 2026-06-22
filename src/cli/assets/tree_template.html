@@ -39,36 +39,45 @@
   .legend{margin-left:auto;display:flex;gap:13px;flex-wrap:wrap;font-size:.76em;color:var(--dim)}
   .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
 
-  main{flex:1 1 auto;overflow:auto;padding:8px 0}
-  svg{display:block;width:100%;height:auto}
+  main{flex:1 1 auto;overflow:auto;padding:14px 20px}
+  svg{display:block}
 
-  .edge{fill:none;stroke:var(--border2);stroke-width:1.6;
-    transition:stroke .4s,opacity .4s;opacity:0}
-  .edge.shown{opacity:.85}
-  .edge.merged{stroke:var(--green)}
-  .edge.pruned{stroke:var(--dim2);stroke-dasharray:3 4;opacity:.5}
+  .edge{fill:none;stroke:var(--border2);stroke-width:2;
+    transition:stroke .4s,opacity .5s;opacity:0}
+  .edge.shown{opacity:.9}
+  .edge.merged{stroke:var(--green);stroke-width:2.4}
+  .edge.pruned{stroke:var(--dim2);stroke-dasharray:4 4;opacity:.55}
 
-  .node{opacity:0;transition:opacity .45s ease}
+  .node{opacity:0;transition:opacity .5s ease}
   .node.born{opacity:1}
-  .node.pruned{opacity:.55}
-  .node .dot{stroke:var(--bg);stroke-width:2;fill:var(--dim);transition:fill .4s}
-  .node.proposed .dot{fill:var(--yellow)}
-  .node.running  .dot{fill:var(--magenta)}
-  .node.running  .ring{stroke:var(--magenta);fill:none;opacity:.6;animation:pulse 1.2s ease-out infinite}
-  .node.done     .dot{fill:var(--blue)}
-  .node.merged   .dot{fill:var(--green);filter:drop-shadow(0 0 6px rgba(63,185,80,.8))}
-  .node.pruned   .dot{fill:var(--dim2)}
-  .node.failed   .dot{fill:var(--red)}
-  .ring{stroke:none;fill:none}
-  @keyframes pulse{0%{r:6px;opacity:.6}100%{r:15px;opacity:0}}
-  .nid{font-family:var(--mono);font-size:12px;fill:var(--dim2);dominant-baseline:middle}
-  .hyp{font-size:14.5px;fill:var(--fg);dominant-baseline:middle}
-  .node.pruned .hyp{fill:var(--dim)}
-  .node.proposed .hyp{fill:var(--dim)}
-  .score{font-family:var(--mono);font-size:13.5px;font-weight:700;fill:var(--green);
-    text-anchor:end;dominant-baseline:middle}
-  .node.pruned .score,.node.proposed .score,.node.running .score,.node.done .score{fill:var(--dim)}
-  .node.merged .score{fill:var(--green)}
+  .node.pruned{opacity:.5}
+  .card{fill:var(--panel2);stroke:var(--border2);stroke-width:1.5;rx:9;
+    transition:stroke .4s,fill .4s}
+  .node.proposed .card{stroke:var(--yellow);stroke-dasharray:4 3}
+  .node.running  .card{stroke:var(--magenta)}
+  .node.done     .card{stroke:var(--blue)}
+  .node.merged   .card{stroke:var(--green);fill:#15241a;
+    filter:drop-shadow(0 0 8px rgba(63,185,80,.45))}
+  .node.pruned   .card{stroke:var(--dim2);stroke-dasharray:4 4}
+  .node.failed   .card{stroke:var(--red)}
+  .node.root .card{fill:#11202c;stroke:var(--cyan)}
+
+  .dot{transition:fill .4s}
+  .node.proposed .dot{fill:var(--yellow)} .node.running .dot{fill:var(--magenta)}
+  .node.done .dot{fill:var(--blue)} .node.merged .dot{fill:var(--green)}
+  .node.pruned .dot{fill:var(--dim2)} .node.failed .dot{fill:var(--red)}
+  .node.root .dot{fill:var(--cyan)}
+  .ring{fill:none;stroke:none}
+  .node.running .ring{stroke:var(--magenta);animation:pulse 1.3s ease-out infinite}
+  @keyframes pulse{0%{r:7px;opacity:.7}100%{r:18px;opacity:0}}
+
+  .nid{font-family:var(--mono);font-size:13px;font-weight:700;fill:var(--fg)}
+  .node.pruned .nid{fill:var(--dim)}
+  .score{font-family:var(--mono);font-size:13px;font-weight:700;fill:var(--green);text-anchor:end}
+  .node.pruned .score,.node.proposed .score,.node.running .score{fill:var(--dim)}
+  .node.done .score{fill:var(--blue)}
+  .hyp{font-size:12.5px;fill:var(--dim)}
+  .node.merged .hyp,.node.done .hyp{fill:var(--fg)}
 
   footer{display:flex;align-items:center;gap:16px;padding:11px 24px;
     border-top:1px solid var(--border);background:var(--bg2);flex:0 0 auto}
@@ -158,7 +167,7 @@ const NODES = buildTopology();
 function stateAt(t){
   const st = new Map();
   for(const id of NODES.keys()) st.set(id,{state:"unborn",score:null});
-  st.get(ROOT).state = "merged"; st.get(ROOT).score = BASE;
+  st.get(ROOT).state = "root"; st.get(ROOT).score = BASE;
   let best = null;
   const better = s => best===null || (MIN ? s<best : s>best);
   for(const e of EVENTS){
@@ -183,30 +192,37 @@ function stateAt(t){
   return {st,best};
 }
 
-// ── layout: indented dendrogram, one row per node (depth = x indent) ─────────
-// Logical coordinate space + viewBox => geometry never depends on the measured
-// element size, so it can't collapse to a pile when clientHeight is 0 at boot.
-const W = 940, ROW = 40, TOP = 26, LEFT = 30, INDENT = 30, DOT_R = 6;
+// ── layout: tidy left→right tree (depth = column, leaves spread down rows) ────
+// Geometry is in logical units inside a fixed viewBox, so it never depends on
+// the measured element size (the old bug: clientHeight 0 → everything collapsed).
+const CARD_W=210, CARD_H=50, COL=270, ROW=70, PADX=24, PADY=20;
 function layout(){
   const children = new Map();
   for(const n of NODES.values()){
     if(n.id===ROOT) continue;
-    (children.get(n.parent) || children.set(n.parent,[]).get(n.parent)).push(n.id);
+    if(!children.has(n.parent)) children.set(n.parent,[]);
+    children.get(n.parent).push(n.id);
   }
   for(const arr of children.values()) arr.sort((a,b)=>NODES.get(a).born-NODES.get(b).born);
-  const rows = []; const pos = new Map();
+  const pos = new Map(); let leaf = 0; let maxDepth = 0;
   (function walk(id,depth){
-    pos.set(id,{depth,row:rows.length}); rows.push(id);
-    for(const k of (children.get(id)||[])) walk(k,depth+1);
+    maxDepth = Math.max(maxDepth, depth);
+    const kids = children.get(id)||[];
+    if(!kids.length){ pos.set(id,{depth,row:leaf++}); return; }
+    let sum=0; for(const k of kids){ walk(k,depth+1); sum+=pos.get(k).row; }
+    pos.set(id,{depth,row:sum/kids.length});
   })(ROOT,0);
-  return {pos,rows,children,height:TOP*2 + Math.max(1,rows.length)*ROW};
+  const rows = Math.max(1, leaf);
+  return {pos,children,maxDepth,
+          width: PADX*2 + (maxDepth+1)*COL + (CARD_W-COL>0?CARD_W-COL:0),
+          height: PADY*2 + rows*ROW};
 }
 const L = layout();
-const H = L.height;
+const VW = Math.max(L.width, PADX*2 + CARD_W), VH = L.height;
 
-function coords(id){
+function nodeXY(id){
   const p = L.pos.get(id);
-  return { x: LEFT + p.depth*INDENT, y: TOP + p.row*ROW + ROW/2 };
+  return { x: PADX + p.depth*COL, y: PADY + p.row*ROW + (ROW-CARD_H)/2 };
 }
 function trunc(s,n){ s=s||""; return s.length<=n?s:s.slice(0,n-1)+"…"; }
 function fmtScore(v){ return v===null||v===undefined?"—":(Math.round(v*100)/100).toString(); }
@@ -214,36 +230,32 @@ function fmtClock(sec){ sec=Math.max(0,sec); const m=Math.floor(sec/60),s=Math.f
 
 // ── build SVG once ───────────────────────────────────────────────────────────
 const svg = document.getElementById("svg");
-svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-svg.style.minHeight = H + "px";
+svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+svg.setAttribute("width", VW); svg.setAttribute("height", VH);
 const gN = document.getElementById("nodes"), gE = document.getElementById("edges");
 const NS = "http://www.w3.org/2000/svg";
 const mk = (t,a)=>{const x=document.createElementNS(NS,t);for(const k in a)x.setAttribute(k,a[k]);return x;};
 const nodeEls = new Map(), edgeEls = new Map();
-const SCORE_X = W - 18;
 
 function buildSVG(){
   for(const n of NODES.values()){
-    const c = coords(n.id);
+    const c = nodeXY(n.id);
     if(n.parent){
-      const p = coords(n.parent);
-      // elbow: down the parent's column, then right into the child
-      const e = mk("path",{class:"edge", d:`M${p.x},${p.y+DOT_R} L${p.x},${c.y} L${c.x-DOT_R},${c.y}`});
+      const p = nodeXY(n.parent);
+      const x1=p.x+CARD_W, y1=p.y+CARD_H/2, x2=c.x, y2=c.y+CARD_H/2, mx=(x1+x2)/2;
+      const e = mk("path",{class:"edge", d:`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`});
       gE.appendChild(e); edgeEls.set(n.id,e);
     }
     const g = mk("g",{class:"node", transform:`translate(${c.x},${c.y})`});
-    g.appendChild(mk("circle",{class:"ring", r:6, cx:0, cy:0}));
-    g.appendChild(mk("circle",{class:"dot", r:DOT_R, cx:0, cy:0}));
-    const idText = mk("text",{class:"nid", x:14, y:0});
-    idText.textContent = n.synthetic ? "base" : n.id;
-    const idW = (n.synthetic?4:String(n.id).length)*7.7 + 22;
-    const hyp = mk("text",{class:"hyp", x:idW, y:0});
-    const avail = SCORE_X - (c.x + idW) - 14;
-    hyp.textContent = trunc(n.synthetic ? "baseline solver" : n.hyp, Math.max(8, Math.floor(avail/8)));
-    const title = mk("title",{}); title.textContent = n.synthetic ? "baseline" : n.hyp;
-    hyp.appendChild(title);
-    const sc = mk("text",{class:"score", x:SCORE_X - c.x, y:0});
-    g.appendChild(idText); g.appendChild(hyp); g.appendChild(sc);
+    g.appendChild(mk("rect",{class:"card", x:0, y:0, width:CARD_W, height:CARD_H, rx:9}));
+    g.appendChild(mk("circle",{class:"ring", cx:0, cy:CARD_H/2, r:7}));
+    g.appendChild(mk("circle",{class:"dot", cx:0, cy:CARD_H/2, r:6, stroke:"var(--bg)", "stroke-width":2}));
+    const nid = mk("text",{class:"nid", x:14, y:19}); nid.textContent = n.synthetic ? "baseline" : n.id;
+    const sc = mk("text",{class:"score", x:CARD_W-12, y:19});
+    const hyp = mk("text",{class:"hyp", x:14, y:38});
+    hyp.textContent = trunc(n.synthetic ? "starting point" : n.hyp, 30);
+    const title = mk("title",{}); title.textContent = n.synthetic ? "baseline" : n.hyp; g.appendChild(title);
+    g.appendChild(nid); g.appendChild(sc); g.appendChild(hyp);
     gN.appendChild(g); nodeEls.set(n.id,{g,sc});
   }
 }
