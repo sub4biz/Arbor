@@ -12,21 +12,24 @@ from __future__ import annotations
 # display order. Each is a single-axis value that maps 1:1 onto a backend, so
 # the config file reads the same as the menu. `auto` resolves to one of the
 # concrete three at setup time.
-PROVIDER_CHOICES = ("auto", "openai-responses", "openai-chat", "anthropic")
+PROVIDER_CHOICES = ("auto", "openai-responses", "openai-chat", "openai-oauth", "anthropic")
 
 # Concrete providers Arbor can store + serve after `auto` is resolved. `litellm`
 # stays a valid backend for back-compat / advanced hand-edited configs, but is
 # no longer advertised in the menu.
-_BACKEND_PROVIDERS = {"anthropic", "openai-responses", "openai-chat", "litellm"}
+_BACKEND_PROVIDERS = {"anthropic", "openai-responses", "openai-chat", "openai-oauth", "litellm"}
 VALID_OPENAI_APIS = {"chat", "responses"}
 
 # Intake-agent LLM call budget — seeded into the agent config by ``run`` and
 # applied directly by the REPL.
-INTAKE_LLM_TIMEOUT = 20.0
+# Some reasoning models (e.g. Claude Opus 4.x) take longer than 20s on the first
+# intake call, which made intake time out and report the model as unavailable.
+# Use a 120s budget with one extra retry so the intake call can complete.
+INTAKE_LLM_TIMEOUT = 120.0
 INTAKE_LLM_PROVIDER_RETRIES = 0
-INTAKE_LLM_RETRY_ATTEMPTS = 2
+INTAKE_LLM_RETRY_ATTEMPTS = 3
 INTAKE_LLM_RETRY_BASE_DELAY = 1.0
-INTAKE_LLM_RETRY_MAX_DELAY = 2.0
+INTAKE_LLM_RETRY_MAX_DELAY = 4.0
 
 # Intake is a planning conversation (read the eval, propose a contract), not a
 # deep-reasoning task — so it overrides the user's reasoning_effort (often
@@ -34,6 +37,7 @@ INTAKE_LLM_RETRY_MAX_DELAY = 2.0
 INTAKE_REASONING_EFFORT = "low"
 
 DEFAULT_OPENAI_MODEL = "gpt-4o"
+DEFAULT_OPENAI_OAUTH_MODEL = "gpt-5.5"
 DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-20250514"
 
 # Read-only WebUI: the browser monitor binds here by default for interactive
@@ -59,6 +63,8 @@ def canonical_provider(provider: str | None, openai_api: str | None = None) -> s
         return "anthropic"
     if p == "litellm":
         return "litellm"
+    if p in ("openai-oauth", "chatgpt", "openai_oauth"):
+        return "openai-oauth"
     if p in ("openai-chat", "chat", "openai_compat", "openai_chat"):
         return "openai-chat"
     if p in ("openai-responses", "responses", "openai_responses", "openai_response"):
@@ -76,6 +82,8 @@ def default_model_for_provider(provider: str | None) -> str | None:
     that must persist a concrete string substitute :data:`DEFAULT_CLAUDE_MODEL`.
     """
     canon = canonical_provider(provider)
+    if canon == "openai-oauth":
+        return DEFAULT_OPENAI_OAUTH_MODEL
     if canon.startswith("openai") or canon == "litellm":
         return DEFAULT_OPENAI_MODEL
     return None

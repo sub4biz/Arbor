@@ -38,7 +38,7 @@ environment and workflow.
 - **2026-06** — Arbor's native CLI runtime and Agent Skill Suite (Codex / Claude Code) are released. 🚀
 - **2026-06** — The Arbor paper is released on [arXiv](https://arxiv.org/abs/2606.11926). 🎉
 
-## �💡 Why Arbor
+## 💡 Why Arbor
 
 * **General-purpose optimization** — From model training and harness engineering
   to data synthesis, Arbor can optimize any task as long as it has a target to
