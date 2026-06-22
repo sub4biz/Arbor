@@ -6,7 +6,12 @@ from typing import Any, TYPE_CHECKING
 
 from ..core.agent import Agent
 from ..core.config import AgentConfig
-from ..core.tools.web import WebSearchTool, WebVisitTool
+from ..core.tools.web import (
+    AlphaXivSearchTool,
+    AlphaXivVisitTool,
+    WebSearchTool,
+    WebVisitTool,
+)
 from .prompts import SEARCH_AGENT_SYSTEM_PROMPT
 
 if TYPE_CHECKING:
@@ -82,11 +87,12 @@ def build_search_agent(
         Optional ``CoordinatorConfig`` — only consulted if a model override is
         configured and a fresh provider needs to be built.
     """
-    if not search_config.web_search_endpoint:
+    if not search_config.has_backend:
         raise ValueError(
-            "build_search_agent requires search_config.web_search_endpoint "
-            "to be set. Configure WEB_SEARCH_ENDPOINT or the YAML "
-            "search.web_search_endpoint."
+            "build_search_agent requires a search backend: either set "
+            "search.web_search_endpoint (WEB_SEARCH_ENDPOINT) for the HTTP "
+            "backend, or set search.builtin_backend='alphaxiv' for the "
+            "zero-config alphaXiv backend (bundled on Python >= 3.12)."
         )
 
     provider = _maybe_override_provider(
@@ -117,23 +123,33 @@ def build_search_agent(
         agent_config.llm_retry_base_delay = meta_config.llm_retry_base_delay
         agent_config.llm_retry_max_delay = meta_config.llm_retry_max_delay
 
-    tools: list = [
-        WebSearchTool(
-            cwd=cwd,
-            endpoint_url=search_config.web_search_endpoint,
-            provider=search_config.web_search_provider,
-            api_key=search_config.web_search_api_key,
-        ),
-    ]
-    if search_config.web_browse_endpoint:
-        tools.append(
-            WebVisitTool(
+    if search_config.builtin_backend == "alphaxiv":
+        # Zero-config alphaXiv backend — no endpoint URL needed.
+        tools: list = [
+            AlphaXivSearchTool(cwd=cwd),
+            AlphaXivVisitTool(
                 cwd=cwd,
-                endpoint_url=search_config.web_browse_endpoint,
                 max_content_tokens=search_config.visit_max_content_tokens,
-                api_key=search_config.web_browse_api_key,
+            ),
+        ]
+    else:
+        tools = [
+            WebSearchTool(
+                cwd=cwd,
+                endpoint_url=search_config.web_search_endpoint,
+                provider=search_config.web_search_provider,
+                api_key=search_config.web_search_api_key,
+            ),
+        ]
+        if search_config.web_browse_endpoint:
+            tools.append(
+                WebVisitTool(
+                    cwd=cwd,
+                    endpoint_url=search_config.web_browse_endpoint,
+                    max_content_tokens=search_config.visit_max_content_tokens,
+                    api_key=search_config.web_browse_api_key,
+                )
             )
-        )
 
     agent = Agent(
         provider=provider,

@@ -5,7 +5,13 @@ designed so any search/browse backend (Tavily, Serper, local index, …) can be
 plugged in via constructor configuration.
 """
 
+from .alphaxiv import AlphaXivSearchTool, AlphaXivVisitTool
 from .search import WebSearchTool
 from .visit import WebVisitTool
 
-__all__ = ["WebSearchTool", "WebVisitTool"]
+__all__ = [
+    "WebSearchTool",
+    "WebVisitTool",
+    "AlphaXivSearchTool",
+    "AlphaXivVisitTool",
+]

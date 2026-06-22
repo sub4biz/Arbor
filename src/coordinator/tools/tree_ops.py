@@ -131,12 +131,14 @@ class TreeAddNodeTool(Tool):
         cwd: str,
         tree: IdeaTree,
         config: CoordinatorConfig | None = None,
+        provider: "LLMProvider | None" = None,
         prune_hook: Callable[[], None] | None = None,
         **kwargs: Any,
     ):
         super().__init__(cwd=cwd, **kwargs)
         self._tree = tree
         self._config = config
+        self._provider = provider
         self._prune_hook = prune_hook
 
     def set_prune_hook(self, hook: Callable[[], None] | None) -> None:
@@ -188,7 +190,19 @@ class TreeAddNodeTool(Tool):
             except Exception as exc:  # noqa: BLE001
                 log.warning("IDEATE context prune hook failed: %s", exc)
 
-        return f"Added node {node_id} (depth={new_depth}) under {parent_id}: {hypothesis}"
+        msg = f"Added node {node_id} (depth={new_depth}) under {parent_id}: {hypothesis}"
+
+        # Pre-experiment novelty check (opt-in via search.auto_search_on_add).
+        # Dispatched in the background; the verdict lands in node.related_work.
+        if self._config is not None and self._provider is not None:
+            from .search_ctx import dispatch_auto_search
+
+            if dispatch_auto_search(
+                self._tree, self._config, self._provider, node_id
+            ):
+                msg += " [pre-experiment novelty check dispatched → related_work]"
+
+        return msg
 
     async def _review_proposed_idea(self, parent_id: str, hypothesis: str) -> tuple[str, str | None]:
         """Pause before committing an idea when idea-stage review is enabled."""

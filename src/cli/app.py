@@ -19,6 +19,7 @@ from .commands.setup_cmd import setup_command, quickstart_command
 from .commands.install_cmd import install_command, uninstall_command
 from .commands.mcp_cmd import mcp_command
 from .commands.web_cmd import web_command
+from .commands.idea_check_cmd import idea_check_command
 
 
 # We don't use a Typer.callback() default because that would shadow flag
@@ -48,6 +49,7 @@ app.command("install")(install_command)
 app.command("uninstall")(uninstall_command)
 app.command("mcp")(mcp_command)
 app.command("web")(web_command)
+app.command("idea-check")(idea_check_command)
 app.add_typer(config_app, name="config")
 app.add_typer(login_app, name="login")
 
@@ -72,7 +74,7 @@ def version_command() -> None:
 
 _KNOWN_COMMANDS = {
     "run", "report", "export", "replay", "config", "version", "doctor", "setup",
-    "quickstart", "login", "install", "uninstall", "mcp", "web",
+    "quickstart", "login", "install", "uninstall", "mcp", "web", "idea-check",
 }
 _ROOT_FLAGS = {"--help", "-h"}
 _VERSION_FLAGS = {"--version", "-V"}

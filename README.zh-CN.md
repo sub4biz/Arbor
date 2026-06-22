@@ -29,6 +29,7 @@
 
 ## 📣 最新动态
 
+- **2026-06** — **内置文献检索与想法新颖性审查。** Arbor 现在可以通过 [alphaXiv](https://www.alphaxiv.org) 公共 API 把研究建立在已有工作之上——零配置，无需搜索端点或密钥。动手前用 `arbor idea-check "<你的想法>"` 审查任意想法的新颖性，或让 Coordinator 自动为每个新分支把关。详见[文献检索与新颖性审查](#-文献检索与新颖性审查)。🔎
 - **2026-06** — Arbor 被美国知名科技媒体 [VentureBeat](https://venturebeat.com/) 报道：[《New AI optimization framework beats Claude Code and Codex by 2.5x on the same compute budget》](https://venturebeat.com/orchestration/new-ai-optimization-framework-beats-claude-code-and-codex-by-2-5x-on-the-same-compute-budget)。📰
 - **2026-06** — Arbor 原生 CLI 运行时与智能体技能套件（Codex / Claude Code）正式发布。🚀
 - **2026-06** — Arbor 论文在 [arXiv](https://arxiv.org/abs/2606.11926) 发布。🎉
@@ -39,6 +40,7 @@
 - **真正落地可用的自主科研** — Arbor 不仅是一个研究原型，它同时提供原生 CLI 运行时和适用于 Codex 与 Claude Code 的智能体技能套件。你可以直接使用完整 CLI 以获得最佳效果，也可以在其他编程智能体中加载技能套件来使用。
 - **长期结构化探索** — 假设树框架让 Arbor 能够持续运行，进行累积式搜索：实验结果、失败原因和提炼出的洞察都会保存在想法树中并向上传播，让后续想法越来越聪明，而不是淹没在无尽的上下文滚动里。
 - **严格的实验纪律** — 执行器在开发集上迭代，在留出的测试集上验证，只有超过可配置阈值的改进才会被合并，有效避免对评估指标的过拟合。
+- **基于文献的想法把关** — 内置零配置搜索后端，直连 [alphaXiv](https://www.alphaxiv.org) 公共 API，让 Arbor 在投入算力*之前*就能审查一个想法的新颖性与先行工作——以判定结果标注在每个想法树节点上，或随时通过 `arbor idea-check` 单独调用。
 - **隔离且可回滚的执行环境** — 每个实验都在独立的 git 工作树和专属分支上运行，在你主动合并之前，`main` 分支始终不受影响。
 - **专为长时间实验设计** — 长时间训练是一等公民：宽裕的超时设置、超时时的部分指标恢复，以及从小规模烟雾测试到试点运行再到完整运行的可选分阶段预算管理。
 - **灵活的模型与工作流支持** — Arbor 通过 LiteLLM 支持 Anthropic、OpenAI / Responses API 及 OpenAI 兼容后端，包括 DeepSeek、Gemini、Qwen、vLLM、Ollama 和本地网关。
@@ -321,6 +323,7 @@ ROOT（基线：20%）
 | `arbor quickstart`       | 用免费密钥（Gemini/Groq）或本地模型（Ollama）快速跑起来。   |
 | `arbor setup`            | 配置模型提供商 / 模型 / API 密钥 → `~/.arbor/config.yaml`。 |
 | `arbor report <session>` | 重新渲染某次历史会话的 `REPORT.md`。                        |
+| `arbor idea-check "<想法>"` | 针对单个想法对照 alphaXiv 做新颖性 / 先行工作审查（Python ≥ 3.12 默认内置）。 |
 | `arbor export <session> [output]` | 将历史会话导出为自包含 HTML；当 `output` 以 `.jsonl` 结尾时导出 JSONL。 |
 | `arbor doctor`           | 诊断安装状态、PATH、git 及 API 密钥。                       |
 | `arbor version`          | 打印已安装的版本号。                                        |
@@ -329,6 +332,44 @@ ROOT（基线：20%）
 | `arbor web <session>`    | 为某次会话打开只读浏览器监控（无需正在进行的运行）。       |
 
 底层入口点（`run-research`、`coordinator`、`executor`、`review-research`）保留供调试使用——详见 [CLI 参考文档](https://ruc-nlpir.github.io/Arbor/docs/cli/)。
+
+------
+
+## 🔎 文献检索与新颖性审查
+
+好的研究始于了解已有工作。Arbor 内置了一个**零配置搜索后端**，直连 [alphaXiv](https://www.alphaxiv.org) 公共 API——无需自建搜索服务，也无需 alphaXiv 密钥——因此它可以调研相关工作并判断一个想法的新颖性。判定结果轻量且面向决策：对该领域的简短总结、最接近的相关论文、`novel` / `partial-overlap` / `prior-art-exists` 三档新颖性评估，以及具体的重叠风险。
+
+### 开启
+
+无需安装——在 **Python ≥ 3.12** 上该后端随 Arbor 默认内置（自带 `alphaxiv-py`），
+复用你已有的 Arbor LLM 凭证，`arbor idea-check` 开箱即用。（在 Python 3.10/3.11 上
+`alphaxiv-py` 不可用，后端会以清晰的提示优雅降级。）
+
+### 三种用法
+
+**1. 独立使用 —— 审查单个想法，无需启动运行。** 在投入之前快速验证一个方向最便捷的方式：
+
+```bash
+arbor idea-check "用实体-关系草稿提升多跳问答"
+arbor idea-check "在代码生成中对方案做树搜索" --json   # 输出原始 JSON
+```
+
+**2. 实验前 —— 自动为每个想法把关。** 开启 `auto_search_on_add`，Coordinator 会在新想法加入树的那一刻后台派发一次新颖性审查；判定结果在执行器运行*之前*就写入该节点的 `related_work` 字段，于是 Arbor 可以修订或剪掉不新颖的想法，而不是把算力浪费在上面：
+
+```yaml title="research_config.yaml"
+search:
+  enabled: true
+  builtin_backend: alphaxiv     # none | alphaxiv
+  auto_search_on_add: true      # 每个新想法在运行前先做新颖性审查
+```
+
+**3. 实验后 —— 为有效的想法做标注。** 默认情况下（`auto_search_on_add: false`），Arbor 仍会为*跑赢主干*的想法调研相关工作，在合并决策前附上先行工作上下文——让每个成果都带着引用到来。
+
+### 关闭
+
+在运行中它**默认关闭**：`builtin_backend` 为 `none`，因此除非你设置 `search.builtin_backend: alphaxiv`（实验前审查还需 `auto_search_on_add: true`），Arbor 绝不会为文献检索访问网络。`arbor idea-check` 本身就是按需调用——只有你主动运行时才会产生开销。更想用自己的搜索服务？通过 `search.web_search_endpoint` 接入自建的 BrowseComp 风格后端的 BYO 路径依然可用。
+
+每个选项的细节请参阅[配置指南](https://ruc-nlpir.github.io/Arbor/docs/configuration/)与 [`arbor idea-check`](https://ruc-nlpir.github.io/Arbor/docs/cli/#arbor-idea-check)。
 
 ------
 

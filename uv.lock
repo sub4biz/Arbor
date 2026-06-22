@@ -5,8 +5,10 @@ resolution-markers = [
     "python_full_version >= '3.15'",
     "python_full_version == '3.14.*' and sys_platform == 'win32'",
     "python_full_version == '3.14.*' and sys_platform != 'win32'",
-    "python_full_version >= '3.11' and python_full_version < '3.14' and sys_platform == 'win32'",
-    "python_full_version >= '3.11' and python_full_version < '3.14' and sys_platform != 'win32'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32'",
+    "python_full_version == '3.11.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'win32'",
+    "python_full_version == '3.11.*' and sys_platform != 'win32'",
     "python_full_version < '3.11'",
 ]
 
@@ -170,6 +172,20 @@ wheels = [
 ]
 
 [[package]]
+name = "alphaxiv-py"
+version = "0.6.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click", marker = "python_full_version >= '3.12'" },
+    { name = "httpx", marker = "python_full_version >= '3.12'" },
+    { name = "rich", marker = "python_full_version >= '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/29/3d/8310bcc7e252a41d815b50467ec9cd1a52a3d9f7d765061150a91f533866/alphaxiv_py-0.6.0.tar.gz", hash = "sha256:5161c9a7cec439bdc158a6b886885973b5fe3dc562b0f41a2dcdfd0ce7a6ebc6", size = 170688, upload-time = "2026-05-18T17:40:51.222Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e8/6d/53c4f12ca6a8c6f50a8209e9feba6c3e8acc04d1481efd9e6ac7fd9a99a9/alphaxiv_py-0.6.0-py3-none-any.whl", hash = "sha256:dedb143e8867377739b89733f21c9da977d7a746dc09b8bb84418acf10f47f44", size = 94152, upload-time = "2026-05-18T17:40:49.442Z" },
+]
+
+[[package]]
 name = "annotated-doc"
 version = "0.0.4"
 source = { registry = "https://pypi.org/simple" }
@@ -224,6 +240,7 @@ wheels = [
 name = "arbor-agent"
 source = { editable = "." }
 dependencies = [
+    { name = "alphaxiv-py", marker = "python_full_version >= '3.12'" },
     { name = "anthropic" },
     { name = "httpx" },
     { name = "litellm" },
@@ -232,6 +249,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pyyaml" },
+    { name = "requests" },
     { name = "rich" },
     { name = "tiktoken" },
     { name = "typer" },
@@ -256,6 +274,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "alphaxiv-py", marker = "python_full_version >= '3.12'", specifier = ">=0.6.0" },
     { name = "anthropic", specifier = ">=0.52.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "litellm", specifier = ">=1.55.0" },
@@ -267,6 +286,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pydantic-settings", specifier = ">=2.0" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "requests", specifier = ">=2.28" },
     { name = "rich", specifier = ">=13.0" },
     { name = "tiktoken", specifier = ">=0.7.0" },
     { name = "typer", specifier = ">=0.12.0" },
@@ -2537,8 +2557,10 @@ resolution-markers = [
     "python_full_version >= '3.15'",
     "python_full_version == '3.14.*' and sys_platform == 'win32'",
     "python_full_version == '3.14.*' and sys_platform != 'win32'",
-    "python_full_version >= '3.11' and python_full_version < '3.14' and sys_platform == 'win32'",
-    "python_full_version >= '3.11' and python_full_version < '3.14' and sys_platform != 'win32'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32'",
+    "python_full_version == '3.11.*' and sys_platform == 'win32'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'win32'",
+    "python_full_version == '3.11.*' and sys_platform != 'win32'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/2e/43/25a8dcd3feedd735039a8f0b5b7e3b118232b5eae288c4fd9ab200d41094/rpds_py-2026.5.1.tar.gz", hash = "sha256:07b24fea40541e28570e5b795a4a38fbdcd12550c06bd0748005ecc8116ca256", size = 64459, upload-time = "2026-05-28T12:02:13.232Z" }
 wheels = [
