@@ -206,16 +206,48 @@ def test_exa_mcp_resolve_and_build():
     assert len(backends) == 1 and backends[0].name == "exa-mcp"
 
 
-def test_exa_mcp_dropped_without_key(monkeypatch):
+def test_exa_mcp_is_keyless(monkeypatch):
+    # The hosted Exa MCP server works without a key — exa-mcp must resolve
+    # even when no EXA_API_KEY is set.
     monkeypatch.delenv("EXA_API_KEY", raising=False)
     sc = SearchConfig(backends=["exa-mcp"])
-    assert resolve_backend_names(sc) == []
+    assert resolve_backend_names(sc) == ["exa-mcp"]
+    assert build_search_backends(sc)[0].name == "exa-mcp"
 
 
 def test_exa_mcp_uses_configured_url():
     sc = SearchConfig(backends=["exa-mcp"], exa_api_key="k", exa_mcp_url="https://my/mcp")
     backend = build_search_backends(sc)[0]
     assert backend._url == "https://my/mcp"
+
+
+def test_exa_mcp_parse_text_format():
+    # The real hosted web_search_exa returns a plain-text block, not JSON.
+    text = (
+        "Title: Self-Consistency Improves CoT\n"
+        "URL: https://arxiv.org/abs/2203.11171\n"
+        "Published: 2022-03-21\n"
+        "Author: N/A\n"
+        "Highlights:\n"
+        "Self-consistency samples diverse reasoning paths and votes.\n"
+        "It improves arithmetic reasoning.\n"
+        "\n"
+        "Title: RAG\n"
+        "URL: https://en.wikipedia.org/wiki/RAG\n"
+        "Published: N/A\n"
+        "Author: N/A\n"
+        "Highlights:\n"
+        "Retrieval augmented generation pulls external docs.\n"
+    )
+    items = ExaMcpBackend._parse(text)
+    assert [i["url"] for i in items] == [
+        "https://arxiv.org/abs/2203.11171",
+        "https://en.wikipedia.org/wiki/RAG",
+    ]
+    assert items[0]["title"] == "Self-Consistency Improves CoT"
+    assert "diverse reasoning paths" in items[0]["snippets"]
+    assert "2022-03-21" in items[0]["snippets"]  # Published kept (not N/A)
+    assert "N/A" not in items[1]["snippets"]      # N/A author/date dropped
 
 
 def test_exa_mcp_parse_results():
@@ -231,18 +263,18 @@ def test_exa_mcp_parse_results():
 
 
 def test_exa_mcp_parse_handles_garbage():
-    assert ExaMcpBackend._parse("not json") == []
+    assert ExaMcpBackend._parse("random prose with no markers") == []
     assert ExaMcpBackend._parse("") == []
 
 
 def test_exa_mcp_search_parses_tool_output(monkeypatch):
     """search() maps the MCP tool's text output without touching the network."""
-    canned = json.dumps({"results": [{"url": "https://e.com", "title": "E", "text": "b"}]})
+    canned = "Title: E\nURL: https://e.com\nPublished: N/A\nAuthor: N/A\nHighlights:\nbody\n"
 
     async def fake_call(self, query, max_results):
         return canned
 
     monkeypatch.setattr(ExaMcpBackend, "_call_tool", fake_call)
-    items = asyncio.run(ExaMcpBackend(api_key="k").search("q", 5))
-    assert items == [{"url": "https://e.com", "title": "E", "snippets": "b"}]
+    items = asyncio.run(ExaMcpBackend().search("q", 5))
+    assert items == [{"url": "https://e.com", "title": "E", "snippets": "body"}]
 
