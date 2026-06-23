@@ -53,7 +53,8 @@ def test_snapshot_maps_tree_counters_and_scores(tmp_path: Path) -> None:
     assert snap["run_name"] == "run_a"
     assert snap["task"] == "Improve score"
     assert snap["model"] == "host-model"
-    assert snap["phase"] == "monitoring"
+    assert snap["phase"] == "monitoring"       # no activity sidecar → neutral
+    assert snap["keyless"] is True             # browser hides token/cache panels
     assert snap["counters"] == {"proposed": 2, "done": 0, "pruned": 1, "merged": 1, "running": 0}
     assert snap["baseline_score"] == 0.2
     assert snap["best_score"] == 0.55          # from meta.trunk_score
@@ -62,6 +63,54 @@ def test_snapshot_maps_tree_counters_and_scores(tmp_path: Path) -> None:
     assert set(ids) == {"1", "2"}              # root excluded
     assert ids["1"]["status"] == "merged" and ids["1"]["branch"] == "exp/n1"
     assert ids["2"]["status"] == "pruned"
+
+
+def test_snapshot_uses_activity_sidecar_for_timing_and_phase(tmp_path: Path) -> None:
+    """With an activity sidecar present, the snapshot exposes a real run clock,
+    per-node runtime, an inferred phase, a running 'agent', and a non-empty
+    improvement trajectory."""
+    import time
+
+    from arbor.mcp import session_timing
+
+    session = _write_session(tmp_path)
+    coord = session / ".coordinator"
+    start = time.time() - 120.0
+    # Hand-write a sidecar: node 1 finished 60s in; node 3 is still running.
+    (coord / session_timing.SIDECAR_NAME).write_text(
+        json.dumps({
+            "session_started_at": start,
+            "updated_at": start + 90,
+            "nodes": {
+                "1": {"created_at": start + 5, "started_at": start + 10, "finished_at": start + 60},
+                "3": {"created_at": start + 70, "started_at": start + 80},
+            },
+            "events": [
+                {"ts": start + 5, "kind": "proposed", "node_id": "1"},
+                {"ts": start + 60, "kind": "merged", "node_id": "1", "score": 0.55},
+                {"ts": start + 80, "kind": "running", "node_id": "3"},
+            ],
+        }),
+        encoding="utf-8",
+    )
+    # Add a running node so phase/agents reflect an in-flight experiment.
+    tree = json.loads((coord / "idea_tree.json").read_text(encoding="utf-8"))
+    tree["nodes"]["3"] = {"id": "3", "parent_id": "ROOT", "depth": 1,
+                          "status": "running", "hypothesis": "try fp16\nsecond line",
+                          "code_ref": "exp/n3"}
+    tree["nodes"]["ROOT"]["children_ids"].append("3")
+    (coord / "idea_tree.json").write_text(json.dumps(tree), encoding="utf-8")
+
+    snap = build_session_snapshot(session, "run_a")
+
+    assert snap["elapsed_seconds"] > 100            # real clock from session start
+    assert snap["phase"] == "benchmark"             # a node is running
+    by_id = {n["node_id"]: n for n in snap["tree"]}
+    assert by_id["1"]["runtime_seconds"] == 50.0    # 60 - 10
+    assert by_id["1"]["finished_elapsed"] == 60.0   # 60 since session start
+    assert by_id["3"]["runtime_seconds"] is not None and by_id["3"]["finished_elapsed"] is None
+    assert "exp/n3" in snap["agents"]               # running node surfaced as agent
+    assert snap["best_score_history"] == [0.55]     # one completed point
 
 
 def test_snapshot_handles_missing_session_gracefully(tmp_path: Path) -> None:

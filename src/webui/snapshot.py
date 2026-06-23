@@ -46,6 +46,10 @@ def empty_state_dict() -> dict[str, Any]:
         "gate": None,
         "paused": False,
         "interactive": False,
+        # True only for the file-backed (keyless) monitor, where token/cache
+        # accounting is owned by the host harness and not observable by Arbor —
+        # the browser uses this to hide those panels rather than show 0s.
+        "keyless": False,
     }
 
 

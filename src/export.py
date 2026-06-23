@@ -52,6 +52,18 @@ def resolve_session_dir(session: Path, cwd: Path | None = None) -> Path:
             cwd / candidate,
             cwd / CONFIG_DIR_NAME / "sessions" / str(session),
         ])
+        # When invoked from a linked git worktree, keyless sessions are anchored
+        # at the main working tree (see session_ops._stable_arbor_base), so look
+        # there too — otherwise a session created by the host agent would appear
+        # "missing" the moment the dashboard is launched from the main checkout.
+        try:
+            from .mcp.session_ops import _stable_arbor_base
+
+            stable = _stable_arbor_base(cwd)
+            if stable != cwd:
+                candidates.append(stable / CONFIG_DIR_NAME / "sessions" / str(session))
+        except Exception:
+            pass
 
     for path in candidates:
         if path.exists() and path.is_dir():

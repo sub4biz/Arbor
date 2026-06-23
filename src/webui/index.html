@@ -108,8 +108,14 @@ function normalizeState(raw){
       : { turns: [], busy: false },
     gate: (s.gate && typeof s.gate === "object") ? s.gate : null,
     paused: !!s.paused, interactive: !!s.interactive,
+    // keyless: file-backed monitor — token/cache accounting is owned by the host
+    // harness and not observable, so the browser hides those panels.
+    keyless: !!s.keyless,
   };
 }
+/* First line of a (possibly multi-line) hypothesis — node titles should read as
+ * a one-liner of what's being tried, not the full four-line rationale. */
+function oneLine(t){ const s=(t==null?'':String(t)); for(const ln of s.split(/\r?\n/)){ const v=ln.trim(); if(v) return v; } return ''; }
 
 /* ───────────────────────── UI state ───────────────────────── */
 const ST = {
@@ -222,7 +228,7 @@ function buildTree(){
     const v = n._root ? { tc:'var(--tx)', vc:'var(--tx2)', bg:'var(--card2)', bd:'var(--line2)', sh:'none', isBest:false } : visual(n);
     const label = n._root ? 'ref' : (n.branch || id);
     const valTxt = n._root ? fmtScore(n.score) : imprStr(n.score);
-    return { id, root:!!n._root, name: n._root?'Baseline':(n.hypothesis||id), idLabel:label, val:valTxt,
+    return { id, root:!!n._root, name: n._root?'Baseline':(oneLine(n.hypothesis)||id), idLabel:label, val:valTxt,
       valColor:v.vc, titleColor:v.tc, bg:v.bg, bd:v.bd, shadow:v.sh, isBest:v.isBest,
       cx:pp.cx, cy:pp.cy, w:NW, h:NH, node:n };
   });
@@ -315,7 +321,7 @@ function renderShell(){
       </div>
     </main>
   </div>
-  <div id="overlay"></div>`;
+  <div id="overlay" style="color:var(--tx);"></div>`;
   renderContent();
   renderOverlay();
   _gateKey=null; renderGate();
@@ -417,14 +423,20 @@ function viewHome(){
           <span id="hp-started" style="color:var(--tx2); font-family:'IBM Plex Mono',monospace;">Started ${fmtAgo(SNAP.elapsed_seconds)}</span>
         </div>
       </div>
-      <div style="display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:12px; align-items:stretch;">
-        ${statCard('Improvement', imprStr(best), 'vs baseline '+baseStr, 'var(--accent)', true)}
-        ${statCard('Best Score', fmtScore(best), 'baseline '+baseStr, 'var(--accent2)', false)}
-        ${statCard('Branches', String(bc.total), `active ${bc.active} · closed ${bc.closed}`, null, false)}
-        ${statCard('Runtime', fmtRun(SNAP.elapsed_seconds), 'total elapsed', null, false, 'st-runtime')}
-        ${statCard('Tokens', fmtTok(SNAP.tokens.input)+' / '+fmtTok(SNAP.tokens.output), 'in / out', 'var(--amber)', false, 'st-tokens')}
-        ${statCard('Cache', cacheHitStr(), fmtTok(SNAP.cache.read)+' read', 'var(--blue)', false, 'st-cache')}
-      </div>
+      ${(()=>{ const cards=[
+          statCard('Improvement', imprStr(best), 'vs baseline '+baseStr, 'var(--accent)', true),
+          statCard('Best Score', fmtScore(best), 'baseline '+baseStr, 'var(--accent2)', false),
+          statCard('Branches', String(bc.total), `active ${bc.active} · closed ${bc.closed}`, null, false),
+          statCard('Runtime', fmtRun(SNAP.elapsed_seconds), 'total elapsed', null, false, 'st-runtime'),
+        ];
+        // Tokens & cache are reported by the LLM harness, not Arbor — keyless
+        // (file-backed) monitors can't observe them, so omit the cards entirely
+        // rather than show static zeros.
+        if(!SNAP.keyless){ cards.push(
+          statCard('Tokens', fmtTok(SNAP.tokens.input)+' / '+fmtTok(SNAP.tokens.output), 'in / out', 'var(--amber)', false, 'st-tokens'),
+          statCard('Cache', cacheHitStr(), fmtTok(SNAP.cache.read)+' read', 'var(--blue)', false, 'st-cache')); }
+        return `<div style="display:grid; grid-template-columns:repeat(${cards.length},minmax(0,1fr)); gap:12px; align-items:stretch;">${cards.join('')}</div>`;
+      })()}
     </div>
 
     <div id="home-charts" style="display:grid; grid-template-columns:1.4fr 1fr; gap:var(--gap); margin-bottom:var(--gap);">${chartsInnerHTML()}</div>
@@ -633,7 +645,7 @@ function currentHypothesis(){
   const running = runningNode();
   const node = running || bestNode();
   const bn = bestNode();
-  const title = node ? (node.hypothesis||node.node_id) : 'No active hypothesis yet';
+  const title = node ? (oneLine(node.hypothesis)||node.node_id) : 'No active hypothesis yet';
   const diag = node ? (node.insight || node.pruned_reason || 'Diagnosis will appear once the node reports.') : 'Waiting for the coordinator to draft a hypothesis.';
   const benching = !!running;
   const conf = confidencePct();
@@ -700,7 +712,7 @@ function ideaList(){
     const isAccepted = n.node_id===bestId;
     const m = isAccepted ? { label:'ACCEPTED', color:'var(--accent)', icon:'grid' } : meta;
     return { id:n.node_id, rank:i+1, status:m.label, color:m.color, soft:softFor(m.color), bd:bdFor(m.color), icon:m.icon,
-      title:n.hypothesis||n.node_id, desc:(n.insight||n.pruned_reason||'').slice(0,90) || '—',
+      title:oneLine(n.hypothesis)||n.node_id, desc:(n.insight||n.pruned_reason||'').slice(0,90) || '—',
       impact: n.score!=null?'—':'pending', score: n.score!=null?imprStr(n.score):((n.status||'').toLowerCase()==='running'?'running':'queued'),
       scoreColor: scoreColorFor(n.score), branch:n.branch||n.node_id, node:n,
       approach: n.insight || 'No path recorded yet.', result: n.pruned_reason || (n.score!=null?('Benchmarked at '+imprStr(n.score)+'.'):'In progress.') };
@@ -971,7 +983,7 @@ function nodeModalHTML(n){
         <span style="flex:none; width:46px; height:46px; border-radius:12px; display:grid; place-items:center; color:${meta.color}; background:${softFor(meta.color)};">${ic('git-branch',22)}</span>
         <div style="flex:1; min-width:0;">
           <div style="display:flex; align-items:center; gap:9px; flex-wrap:wrap;"><span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--tx3);">${esc(n.branch||n.node_id)}</span><span style="padding:4px 9px; border-radius:6px; font-size:10.5px; font-weight:700; letter-spacing:.06em; color:${meta.color}; background:${softFor(meta.color)}; border:1px solid ${bdFor(meta.color)};">${meta.label}</span><span style="font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--tx3);">parent ${esc(parent)}</span></div>
-          <h2 style="margin:9px 0 0; font-size:20px; font-weight:700; letter-spacing:-.01em; line-height:1.25;">${esc(n.hypothesis||n.node_id)}</h2>
+          <h2 style="margin:9px 0 0; font-size:20px; font-weight:700; letter-spacing:-.01em; line-height:1.25; color:var(--tx);">${esc(oneLine(n.hypothesis)||n.node_id)}</h2>
         </div>
         <button data-act="close-node" title="Close" class="hb" style="all:unset; cursor:pointer; flex:none; width:32px; height:32px; border-radius:8px; display:grid; place-items:center; color:var(--tx3); border:1px solid var(--line);">${ic('x',15)}</button>
       </div>
