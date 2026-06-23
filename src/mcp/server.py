@@ -37,6 +37,7 @@ TOOL_NAMES = (
     "git_merge_branch",
     "generate_report",
     "open_dashboard",
+    "scaffold_benchmark",
 )
 
 # Human-readable hint shown when the optional SDK is missing.
@@ -132,6 +133,35 @@ def build_server() -> Any:
             metric_direction=metric_direction, trunk_branch=trunk_branch,
             dataset_info=dataset_info, submission_path=submission_path,
             sample_submission_path=sample_submission_path,
+        )
+
+    # ── Benchmark scaffolding ──────────────────────────────────────────────────
+
+    @server.tool()
+    def scaffold_benchmark(
+        name: str,
+        metric_direction: str,
+        splits: dict[str, Any],
+        baseline: dict[str, Any] | None = None,
+        edit: list[str] | None = None,
+        eval_cmd: str | None = None,
+        style: str = "light",
+        eval_entrypoint: str = "eval.py",
+        git_init: bool = False,
+        cwd: str | None = None,
+    ) -> dict[str, Any]:
+        """Create the Arbor-ready reference folder in cwd.
+
+        style: light (runnable eval + dev/test split + editable solution.py) |
+        zoo (adds the README front-matter contract + PROVENANCE.md and runs the
+        structural verifier). Writes measurement plumbing only — never the
+        solution. Idempotent: existing files are reported as skipped. Takes no
+        run_name: scaffolding precedes a session, so it operates on a directory.
+        """
+        return ops.scaffold_benchmark(
+            _cwd(cwd), name=name, metric_direction=metric_direction, splits=splits,
+            baseline=baseline, edit=edit, eval_cmd=eval_cmd, style=style,
+            eval_entrypoint=eval_entrypoint, git_init=git_init,
         )
 
     # ── Evaluation ───────────────────────────────────────────────────────────
