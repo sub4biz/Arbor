@@ -303,3 +303,33 @@ def test_worktree_remove_refuses_paths_outside_scratch(tmp_path: Path) -> None:
         ops.worktree_remove(tmp_path, victim)
 
     assert victim.is_dir() and (victim / "keep.txt").exists()  # untouched
+
+
+# ── scaffold_benchmark ────────────────────────────────────────────────────────
+
+_SCAFFOLD_SPLITS = {
+    "kind": "seed_range",
+    "dev": {"base": 1000, "count": 3},
+    "test": {"base": 9000, "count": 3},
+}
+
+
+def test_scaffold_benchmark_light(tmp_path):
+    out = ops.scaffold_benchmark(
+        tmp_path, name="demo", metric_direction="maximize",
+        splits=_SCAFFOLD_SPLITS, style="light",
+    )
+    assert "eval.py" in out["created"]
+    assert out["verify"] == []
+    assert out["git_committed"] is False
+    assert isinstance(out["next_steps"], list)
+
+
+def test_scaffold_benchmark_zoo_with_git_init(tmp_path):
+    out = ops.scaffold_benchmark(
+        tmp_path, name="demo", metric_direction="maximize",
+        splits=_SCAFFOLD_SPLITS, style="zoo", git_init=True,
+    )
+    assert out["git_committed"] is True
+    assert (tmp_path / ".git").exists()
+    assert all(r["status"] != "fail" for r in out["verify"])

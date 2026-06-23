@@ -324,6 +324,52 @@ def tree_set_meta(cwd: str | Path, run_name: str, **meta: Any) -> dict[str, Any]
     return {"meta_updated": sorted(updates)}
 
 
+# ── Benchmark scaffolding ───────────────────────────────────────────────────────
+
+
+def scaffold_benchmark(
+    cwd: str | Path,
+    *,
+    name: str,
+    metric_direction: str,
+    splits: dict[str, Any],
+    baseline: dict[str, Any] | None = None,
+    edit: list[str] | None = None,
+    eval_cmd: str | None = None,
+    style: str = "light",
+    eval_entrypoint: str = "eval.py",
+    git_init: bool = False,
+) -> dict[str, Any]:
+    """Create the Arbor reference folder under *cwd*; optionally git-init it.
+
+    Pure filesystem + git work, no LLM. Returns created/skipped files, the zoo
+    structural verify results (zoo style only), next-step hints, and whether a
+    baseline commit was made.
+    """
+    from ..zoo import scaffold_benchmark as _scaffold
+
+    target = Path(cwd)
+    res = _scaffold(
+        target, name=name, metric_direction=metric_direction, splits=splits,
+        baseline=baseline, edit=edit, eval_cmd=eval_cmd, style=style,
+        eval_entrypoint=eval_entrypoint,
+    )
+    committed = False
+    if git_init and not (target / ".git").exists():
+        git(target, "init")
+        git(target, "add", "-A")
+        rc, _ = git(target, "commit", "-m", "baseline: scaffold Arbor benchmark structure")
+        committed = rc == 0
+    return {
+        "created": res.created,
+        "skipped": res.skipped,
+        "verify": [{"name": r.name, "status": r.status, "message": r.message}
+                   for r in res.verify],
+        "next_steps": res.next_steps,
+        "git_committed": committed,
+    }
+
+
 # ── Evaluation ────────────────────────────────────────────────────────────────
 
 
