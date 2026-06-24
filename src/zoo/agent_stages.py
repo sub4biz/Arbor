@@ -19,11 +19,13 @@ needs a configured provider (API key); validating its *reasoning* needs live ite
 
 from __future__ import annotations
 
+import json
 import os
+import re
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Awaitable, Protocol
+from typing import Any, Awaitable, Protocol
 
 from .pack import find_eval_entrypoint
 from .verify import VerifyResult, verify_pack
@@ -134,8 +136,113 @@ async def bringup(
     return result
 
 
+# ── Stage 0: discovery (natural-language query → a chosen benchmark source) ──
+
+DISCOVERY_SYSTEM_PROMPT = """\
+You are a benchmark discovery assistant. Given a natural-language request, you search the
+web for a benchmark that fits, judge the candidates, and pick the single best one.
+
+Use the search and page-fetch tools to look across GitHub, HuggingFace, arXiv /
+PapersWithCode, and leaderboards. For each candidate, judge:
+  * does it ship a runnable eval and a baseline (not just a dataset)?
+  * does the task have headroom to optimize (an artifact Arbor can edit), not just measure
+    a frozen model?
+  * compute fit and license — can it be cloned and run, and is it redistributable?
+  * is it a representative / actively-used benchmark for the request?
+
+Prefer a GitHub repo that already contains an eval + baseline. End your reply with a single
+fenced JSON block describing your choice (and nothing after it):
+
+```json
+{
+  "name": "short_kebab_name",
+  "source": {"kind": "git", "url": "https://github.com/owner/repo"},
+  "metric": "what is optimized, and whether higher/lower is better",
+  "baseline": "where/what the harvestable baseline is",
+  "why": "one or two sentences on why this fits the request"
+}
+```
+
+If nothing suitable is found, set "source" to null and explain in "why".
+"""
+
+
+@dataclass
+class DiscoveryResult:
+    """Outcome of a discovery run: the chosen benchmark source (or none)."""
+
+    choice: dict[str, Any] | None = None     # {name, source:{kind,url}, metric, baseline, why}
+    transcript: str = ""
+    ok: bool = False
+    notes: list[str] = field(default_factory=list)
+
+    @property
+    def url(self) -> str | None:
+        src = (self.choice or {}).get("source") or {}
+        return src.get("url") if isinstance(src, dict) else None
+
+    @property
+    def name(self) -> str | None:
+        return (self.choice or {}).get("name")
+
+
+def _extract_json(text: str) -> dict[str, Any] | None:
+    """Pull the last JSON object out of the agent's reply (a ```json fenced block, or a
+    bare top-level object)."""
+    blocks = re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if not blocks:
+        blocks = re.findall(r"(\{(?:[^{}]|\{[^{}]*\})*\})", text, re.DOTALL)
+    for block in reversed(blocks):
+        try:
+            obj = json.loads(block)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict) and "source" in obj:
+            return obj
+    return None
+
+
+async def discover(
+    query: str,
+    *,
+    run_agent: AgentRunner,
+    work_dir: Path,
+    max_turns: int = 24,
+) -> DiscoveryResult:
+    """Run the discovery agent on a natural-language *query*; return the chosen source.
+
+    *run_agent* should be a search-enabled runner (``real_agent_runner(with_search=True)``);
+    *work_dir* is a scratch directory for the agent's tools.
+    """
+    result = DiscoveryResult()
+    work_dir.mkdir(parents=True, exist_ok=True)
+    task = (
+        f"Find a benchmark for this request and pick the single best one:\n\n{query}\n\n"
+        "Search across GitHub / HuggingFace / arXiv, judge the candidates, and end with the "
+        "JSON block described in your instructions."
+    )
+    try:
+        result.transcript = await run_agent(
+            cwd=work_dir, system_prompt=DISCOVERY_SYSTEM_PROMPT, task=task, max_turns=max_turns)
+    except Exception as exc:  # noqa: BLE001 — surface agent/provider errors
+        result.notes.append(f"agent run failed: {exc}")
+        return result
+
+    choice = _extract_json(result.transcript)
+    if choice is None:
+        result.notes.append("no JSON choice found in the agent's reply")
+        return result
+    result.choice = choice
+    if not result.url:
+        result.notes.append(f"no source url chosen: {choice.get('why', '(no reason given)')}")
+        return result
+    result.ok = True
+    return result
+
+
 def real_agent_runner(
     *,
+    with_search: bool = False,
     provider: str | None = None,
     model: str | None = None,
     api_key: str | None = None,
@@ -143,7 +250,9 @@ def real_agent_runner(
 ) -> AgentRunner:
     """Build the real :class:`Agent`-backed runner. Needs a configured provider / API key.
 
-    Heavy imports are deferred so importing :mod:`arbor.zoo` stays light.
+    With ``with_search=True`` the agent also gets keyless web search + fetch tools
+    (alphaXiv + Jina) so it can browse for benchmarks. Heavy imports are deferred so
+    importing :mod:`arbor.zoo` stays light.
     """
     async def _run(*, cwd: Path, system_prompt: str, task: str, max_turns: int) -> str:
         from arbor.core import Agent, AgentConfig, create_provider
@@ -156,7 +265,18 @@ def real_agent_runner(
                    "base_url": base_url}.items() if v is not None}
         cfg = AgentConfig(cwd=str(cwd), max_turns=max_turns, auto_git=False, **llm_kw)
         prov = create_provider(cfg)
-        tools = get_all_tools(cwd=str(cwd), config=cfg)
+        tools = list(get_all_tools(cwd=str(cwd), config=cfg))
+        if with_search:
+            from arbor.coordinator.config import SearchConfig
+            from arbor.core.tools.web.factory import (
+                build_web_search_tool,
+                build_web_visit_tool,
+            )
+            sc = SearchConfig(builtin_backend="alphaxiv", visit_backend="jina")
+            for t in (build_web_search_tool(sc, cwd=str(cwd)),
+                      build_web_visit_tool(sc, cwd=str(cwd))):
+                if t is not None:
+                    tools.append(t)
         agent = Agent(provider=prov, tools=tools, system_prompt=system_prompt, config=cfg)
         return await agent.run(task)
 

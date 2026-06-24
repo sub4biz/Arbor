@@ -12,8 +12,9 @@ one folder per benchmark.
   point Arbor at it and it begins optimizing.
 - **Onboard your own task.** If you have code but no runnable eval, one command adds the eval
   scaffolding.
-- **Collect new ones (in progress).** Have Arbor fetch a benchmark from GitHub / HuggingFace
-  and shape it into this format.
+- **Collect new ones (in progress).** Describe what you want in natural language and have
+  Arbor search GitHub / HuggingFace / arXiv, judge the candidates, fetch one, and bring up
+  its baseline — or point it straight at a repo URL.
 
 ## What a benchmark contains
 
@@ -37,7 +38,7 @@ and repeat.
 | Run Arbor on a benchmark | copy it out of the repo, `git init`, run `arbor` inside it |
 | Verify a benchmark's structure | `arbor benchmark verify <dir>` |
 | Make your code a runnable benchmark | `arbor benchmark scaffold <dir>` |
-| Fetch a benchmark from GitHub / HF | `arbor benchmark add <url> --name <name>` |
+| Find & fetch a benchmark | `arbor benchmark add "<query>"` (or a repo URL) `--bringup` |
 
 Running one:
 

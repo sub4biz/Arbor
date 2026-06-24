@@ -8,9 +8,10 @@ Subcommands:
   leaderboard).
 * ``arbor benchmark scaffold <dir>`` — write the measurement plumbing (light) or a
   full zoo benchmark (zoo) into an existing local directory.
-* ``arbor benchmark add <spec> --name <name>`` — acquire a benchmark (git repo / HF
-  dataset) into the global cache and scaffold a draft pack (Phase 1: the deterministic
-  spine; the agent-driven survey + bring-up are the next sub-phase).
+* ``arbor benchmark add "<query>" | <url>`` — collect a benchmark into the zoo. A
+  natural-language query is resolved by the discovery agent (search + judge); a URL
+  (git repo / HF dataset) skips discovery. Both clone into the global cache and scaffold a
+  draft; ``--bringup`` then has an agent make the baseline run.
 """
 
 from __future__ import annotations
@@ -147,15 +148,19 @@ def scaffold_command(
 def add_command(
     spec: str = typer.Argument(
         ...,
-        help="A git repo URL (optionally `url@commit`) or a HF dataset (`hf:<id>`).",
+        help="A natural-language query, a git repo URL (optionally `url@commit`), or a HF "
+             "dataset (`hf:<id>`). A query is resolved by the discovery agent.",
     ),
-    name: str = typer.Option(
-        ..., "--name", "-n",
-        help="Pack name (the arbor-zoo/<name> folder).",
+    name: str | None = typer.Option(
+        None, "--name", "-n",
+        help="Pack name (the arbor-zoo/<name> folder). Optional for a query (discovery suggests one).",
     ),
     dest: Path = typer.Option(
         Path("arbor-zoo"), "--dest",
         help="Where to write the draft pack (default: ./arbor-zoo).",
+    ),
+    assume_yes: bool = typer.Option(
+        False, "--yes", "-y", help="Skip the confirmation prompt for a discovered benchmark.",
     ),
     do_bringup: bool = typer.Option(
         False, "--bringup",
@@ -166,17 +171,49 @@ def add_command(
         40, "--max-turns", help="Agent turn budget for --bringup.",
     ),
 ) -> None:
-    """Acquire a benchmark and scaffold a draft pack; optionally run the bring-up agent.
+    """Collect a benchmark into the zoo from a query or a URL.
 
-    The deterministic spine clones/downloads into the global cache and scaffolds a draft.
-    With ``--bringup`` (and a configured provider), an agent then makes the baseline run and
-    fills in the README + PROVENANCE. Drafting is automated; acceptance stays a human step.
+    A natural-language query is resolved by the **discovery agent** (it searches GitHub /
+    HuggingFace / arXiv, judges candidates, and proposes one — needs a configured provider).
+    A URL skips discovery. Either way the spine clones into the global cache and scaffolds a
+    draft; ``--bringup`` then has an agent make the baseline run. Acceptance stays human.
     """
+    # ── Natural-language query → discovery agent → a chosen URL ──────────────
     if select_acquirer(spec) is None:
-        typer.secho(
-            f"error: no acquirer matched {spec!r} — expected a git URL or `hf:<dataset-id>`",
-            fg=typer.colors.RED, err=True,
-        )
+        import asyncio
+        import tempfile
+
+        from ...zoo import discover, real_agent_runner
+
+        typer.secho(f"searching for a benchmark matching: {spec!r} …", fg=typer.colors.CYAN)
+        try:
+            disc = asyncio.run(discover(
+                spec, run_agent=real_agent_runner(with_search=True),
+                work_dir=Path(tempfile.mkdtemp(prefix="arbor-discover-")),
+            ))
+        except Exception as exc:  # noqa: BLE001
+            typer.secho(f"  discovery could not start: {exc}", fg=typer.colors.RED, err=True)
+            typer.echo("  (configure a provider with `arbor setup` / set your API key)")
+            raise typer.Exit(code=1) from exc
+        for note in disc.notes:
+            typer.echo(f"  • {note}")
+        if not disc.ok or not disc.url:
+            typer.secho("no suitable benchmark found — give a specific repo URL instead.",
+                        fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=1)
+        choice = disc.choice or {}
+        typer.secho(f"\nchosen: {disc.name}  →  {disc.url}", fg=typer.colors.GREEN)
+        typer.echo(f"  metric:   {choice.get('metric', '?')}")
+        typer.echo(f"  baseline: {choice.get('baseline', '?')}")
+        typer.echo(f"  why:      {choice.get('why', '?')}")
+        if not assume_yes and not typer.confirm("\nacquire this benchmark?", default=True):
+            raise typer.Exit(code=0)
+        spec = disc.url
+        name = name or disc.name
+
+    if not name:
+        typer.secho("error: --name is required (could not infer one).",
+                    fg=typer.colors.RED, err=True)
         raise typer.Exit(code=2)
 
     typer.echo(f"collecting {name} from {spec} …")

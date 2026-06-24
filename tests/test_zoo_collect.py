@@ -133,6 +133,8 @@ def test_cli_add(cache: Path, tmp_path: Path) -> None:
     assert "still to do" in result.output
 
 
-def test_cli_add_rejects_bad_spec(tmp_path: Path) -> None:
-    result = CliRunner().invoke(app, ["benchmark", "add", "!!!", "--name", "x"])
+def test_cli_add_url_without_name_errors(cache: Path, tmp_path: Path) -> None:
+    # A URL/path spec skips discovery; without --name (and none to infer) it errors.
+    repo = _make_repo(tmp_path)
+    result = CliRunner().invoke(app, ["benchmark", "add", str(repo)])
     assert result.exit_code == 2
