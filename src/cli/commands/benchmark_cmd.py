@@ -157,8 +157,12 @@ def scaffold_command(
     if git_init and not (target / ".git").exists():
         subprocess.run(["git", "init"], cwd=target, check=False)
         subprocess.run(["git", "add", "-A"], cwd=target, check=False)
-        subprocess.run(["git", "commit", "-m", "baseline: scaffold Arbor benchmark structure"],
-                       cwd=target, check=False)
+        # Ephemeral identity so the commit succeeds without a global git user.
+        subprocess.run(
+            ["git", "-c", "user.email=arbor@localhost", "-c", "user.name=Arbor",
+             "commit", "-m", "baseline: scaffold Arbor benchmark structure"],
+            cwd=target, check=False,
+        )
 
     typer.echo(f"scaffolded {target.name} ({style}) …")
     for f in res.created:
