@@ -58,7 +58,9 @@ nav:
       - Interaction Modes: interaction-modes.md
       - Web UI & Monitoring: web-ui.md
       - Plugins: plugins.md
-      - Benchmark Zoo: zoo.md
+      - Benchmark Zoo:
+          - Overview: zoo-overview.md
+          - Format & verifier: zoo.md
       - Skills: skills.md
       - Outputs & Resume: outputs-and-resume.md
   - Reference:
@@ -120,6 +122,8 @@ plugins:
             Web UI & Monitoring: Web UI 与监控
             Plugins: 插件
             Benchmark Zoo: 基准动物园
+            Overview: 概览
+            Format & verifier: 格式与校验器
             Skills: 技能
             Outputs & Resume: 输出与续跑
             Reference: 参考
