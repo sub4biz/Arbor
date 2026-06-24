@@ -53,11 +53,19 @@ baseline:
   tolerance: 0.30              # reproduce + determinism 的相对容差
   kind: timing                 # exact | timing（timing 用比值容差）
 edit: [solution.py]            # 可编辑文件/glob（≥1）；其余一切受保护
+frozen:                        # 可选 —— 冻结轴（为可比性固定什么）
+  model: gpt-x                 #   冻模型 → 测被编辑的方法，而非换模型
+  budget: "wall-clock 1h"      #   或只冻预算 → 任意机制（训练/scaffold）平等竞争
 ---
 ```
 
 基于路径的 split 写成 `splits: {kind: path, dev: ["data/dev/**"], test: ["data/test/**"]}`。
 这些字段名复用[插件](plugins.md)词汇，所以一个通过校验的基准稍加改动即可变成 plugin。
+
+可选的 **`frozen:`** 是*冻结轴*——一个 pack 固定什么，好让"提升"可归因、两次 run 可比。**冻模型**
+（`edit:` 是 scaffold/prompt）测被编辑的方法；或只**冻预算**（算力/wall-clock，`edit:` 覆盖训练+
+scaffold+数据）让任意机制平等竞争（MLE-bench 式）。自包含的 artifact 优化任务（如 `algotune_knn`，
+只冻受保护的 eval）可省略它。
 
 ### `README.md` 正文 —— 四个固定章节
 

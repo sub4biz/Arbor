@@ -18,6 +18,9 @@ baseline:
   tolerance: 0.0               # relative margin for reproduce + determinism
   kind: exact                  # exact | timing  (timing uses a ratio tolerance)
 edit: [solution.py]            # the editable surface (1+ files/globs); everything else is protected
+# frozen:                      # OPTIONAL — the freeze axis (what's held fixed for comparability)
+#   model: gpt-x               #   freeze the model (edit = scaffold/prompt), OR
+#   budget: "wall-clock 1h"    #   freeze only a budget (edit spans training+scaffold)
 ---
 
 # TODO_pack_name

@@ -61,12 +61,22 @@ baseline:
   tolerance: 0.30              # relative margin for reproduce + determinism
   kind: timing                 # exact | timing  (timing uses a ratio tolerance)
 edit: [solution.py]            # editable files/globs (1+); everything else is protected
+frozen:                        # OPTIONAL — the freeze axis (what's held fixed for comparability)
+  model: gpt-x                 #   freeze the model → measures the edited artifact, not a model swap
+  budget: "wall-clock 1h"      #   or freeze only a budget → any mechanism (train/scaffold) competes
 ---
 ```
 
 For a path-based split, write `splits: {kind: path, dev: ["data/dev/**"], test: ["data/test/**"]}`.
 The same field names reuse the [plugin](plugins.md) vocabulary, so a verified benchmark
 can be turned into a plugin with little rework.
+
+The optional **`frozen:`** field is the *freeze axis* — what a pack holds fixed so an
+improvement is attributable and two runs are comparable. Freeze the **model** (`edit:` is a
+scaffold/prompt) to measure the edited method; or freeze only a **budget** (compute/wall-clock,
+with `edit:` spanning training + scaffold + data) to let *any* mechanism compete on equal
+footing (MLE-bench style). Omit it for self-contained artifact-optimization tasks (e.g.
+`algotune_knn`) that freeze nothing but the protected eval.
 
 ### `README.md` body — four fixed sections
 

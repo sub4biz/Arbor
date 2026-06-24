@@ -1,21 +1,34 @@
-"""`arbor benchmark` — verify and list Task Packs in the zoo.
+"""`arbor benchmark` — verify, list, scaffold, and collect Task Packs in the zoo.
 
-Two subcommands:
+Subcommands:
 
 * ``arbor benchmark verify <pack-dir>`` — run the gate that decides whether a pack
   is allowed into the zoo. Exits non-zero if any check fails.
 * ``arbor benchmark list [zoo-dir]`` — print a plain index of packs (not a ranked
   leaderboard).
+* ``arbor benchmark scaffold <dir>`` — write the measurement plumbing (light) or a
+  full zoo benchmark (zoo) into an existing local directory.
+* ``arbor benchmark add <spec> --name <name>`` — acquire a benchmark (git repo / HF
+  dataset) into the global cache and scaffold a draft pack (Phase 1: the deterministic
+  spine; the agent-driven survey + bring-up are the next sub-phase).
 """
 
 from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import typer
 
-from ...zoo import VerifyResult, discover_packs, find_eval_entrypoint, verify_pack
+from ...zoo import (
+    VerifyResult,
+    collect,
+    discover_packs,
+    find_eval_entrypoint,
+    select_acquirer,
+    verify_pack,
+)
 
 benchmark_app = typer.Typer(
     name="benchmark",
@@ -119,6 +132,7 @@ def scaffold_command(
 
     target = target_dir.resolve()
     pack_name = name or target.name
+    splits: dict[str, Any]
     if split_kind == "path":
         splits = {"kind": "path", "dev": ["data/dev/**"], "test": ["data/test/**"]}
     elif split_kind == "seed_range":
@@ -143,8 +157,12 @@ def scaffold_command(
     if git_init and not (target / ".git").exists():
         subprocess.run(["git", "init"], cwd=target, check=False)
         subprocess.run(["git", "add", "-A"], cwd=target, check=False)
-        subprocess.run(["git", "commit", "-m", "baseline: scaffold Arbor benchmark structure"],
-                       cwd=target, check=False)
+        # Ephemeral identity so the commit succeeds without a global git user.
+        subprocess.run(
+            ["git", "-c", "user.email=arbor@localhost", "-c", "user.name=Arbor",
+             "commit", "-m", "baseline: scaffold Arbor benchmark structure"],
+            cwd=target, check=False,
+        )
 
     typer.echo(f"scaffolded {target.name} ({style}) …")
     for f in res.created:
@@ -157,3 +175,54 @@ def scaffold_command(
         typer.echo("\nnext steps:")
         for s in res.next_steps:
             typer.echo(f"  - {s}")
+
+
+@benchmark_app.command("add")
+def add_command(
+    spec: str = typer.Argument(
+        ...,
+        help="A git repo URL (optionally `url@commit`) or a HF dataset (`hf:<id>`).",
+    ),
+    name: str = typer.Option(
+        ..., "--name", "-n",
+        help="Pack name (the arbor-zoo/<name> folder).",
+    ),
+    dest: Path = typer.Option(
+        Path("arbor-zoo"), "--dest",
+        help="Where to write the draft pack (default: ./arbor-zoo).",
+    ),
+) -> None:
+    """Acquire a benchmark and scaffold a draft pack (deterministic spine).
+
+    Phase 1: selects an acquirer, clones/downloads into the global cache, scaffolds a
+    draft pack, and structurally verifies it. The agent-driven survey + baseline bring-up
+    are the next sub-phase — this leaves a draft for a human (or a later agent pass) to
+    complete, then `arbor benchmark verify` and accept.
+    """
+    if select_acquirer(spec) is None:
+        typer.secho(
+            f"error: no acquirer matched {spec!r} — expected a git URL or `hf:<dataset-id>`",
+            fg=typer.colors.RED, err=True,
+        )
+        raise typer.Exit(code=2)
+
+    typer.echo(f"collecting {name} from {spec} …")
+    try:
+        result = collect(spec, name=name, dest_root=dest.resolve())
+    except RuntimeError as exc:
+        typer.secho(f"error: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
+    for note in result.notes:
+        typer.echo(f"  • {note}")
+
+    fails = [r for r in result.verify_results if r.status == "fail"]
+    if result.draft_pack_dir:
+        typer.secho(f"\ndraft pack: {result.draft_pack_dir}", fg=typer.colors.GREEN)
+    typer.echo(f"structural verify: {len(fails)} fail(s) "
+               f"(eval not run — the draft eval is a stub)")
+
+    typer.secho("\nstill to do (drafting is automated, acceptance is not):",
+                fg=typer.colors.YELLOW)
+    for step in result.pending:
+        typer.echo(f"  - {step}")

@@ -156,7 +156,14 @@ def _check_contract(ctx: _Ctx) -> VerifyResult:
             f"front-matter missing/invalid: {', '.join(missing)}",
             "see the front-matter schema in docs/zoo.md",
         )
-    return VerifyResult("contract", "pass", "front-matter contract complete")
+    # `frozen:` is optional (the freeze axis); if present it must be a mapping.
+    if c.frozen and not isinstance(c.frozen, dict):
+        return VerifyResult(
+            "contract", "fail", "frozen: must be a mapping (e.g. {model: …, budget: …})",
+            "declare what is held fixed so improvement is attributable",
+        )
+    note = f"; freeze: {', '.join(sorted(c.frozen))}" if isinstance(c.frozen, dict) and c.frozen else ""
+    return VerifyResult("contract", "pass", f"front-matter contract complete{note}")
 
 
 def _check_readme_sections(ctx: _Ctx) -> VerifyResult:

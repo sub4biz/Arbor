@@ -358,7 +358,14 @@ def scaffold_benchmark(
     if git_init and not (target / ".git").exists():
         git(target, "init")
         git(target, "add", "-A")
-        rc, _ = git(target, "commit", "-m", "baseline: scaffold Arbor benchmark structure")
+        # Commit with an ephemeral identity (-c) so the baseline commit succeeds on
+        # machines/CI with no global git user configured, without mutating the
+        # user's git config.
+        rc, _ = git(
+            target,
+            "-c", "user.email=arbor@localhost", "-c", "user.name=Arbor",
+            "commit", "-m", "baseline: scaffold Arbor benchmark structure",
+        )
         committed = rc == 0
     return {
         "created": res.created,
