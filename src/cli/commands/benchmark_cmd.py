@@ -8,10 +8,13 @@ Subcommands:
   leaderboard).
 * ``arbor benchmark scaffold <dir>`` — write the measurement plumbing (light) or a
   full zoo benchmark (zoo) into an existing local directory.
-* ``arbor benchmark add "<query>" | <url>`` — collect a benchmark into the zoo. A
-  natural-language query is resolved by the discovery agent (search + judge); a URL
-  (git repo / HF dataset) skips discovery. Both clone into the global cache and scaffold a
-  draft; ``--bringup`` then has an agent make the baseline run.
+* ``arbor benchmark add "<request>" | <url>`` — turn a one-line request into a runnable
+  draft task. A natural-language request is handled end-to-end by an agent: it finds the
+  dataset/benchmark, asks (on a TTY) which dataset to use and where the baseline comes from
+  (harvest an existing one / implement the method you described / find one online), acquires
+  the data, and brings up a runnable draft (baseline + eval + README + PROVENANCE) — without
+  force-running the eval. A bare URL/HF spec skips discovery and just acquires + scaffolds;
+  ``--bringup`` also brings up its baseline.
 """
 
 from __future__ import annotations
@@ -23,7 +26,9 @@ import typer
 
 from ...zoo import (
     VerifyResult,
+    bringup,
     collect,
+    discover,
     discover_packs,
     select_acquirer,
     verify_pack,
@@ -49,15 +54,19 @@ def _render(r: VerifyResult) -> None:
             typer.secho(f"         hint: {r.hint}", fg=typer.colors.RED, err=True)
 
 
-def _user_runner(*, with_search: bool):
+def _user_runner(*, with_search: bool, ask_user: bool = False):
     """Build an agent runner that uses the user's configured provider (~/.arbor/config.yaml),
-    so the collection agents inherit the same LLM as `arbor run` (e.g. openai-oauth/gpt-5.5)."""
+    so the collection agents inherit the same LLM as `arbor run` (e.g. openai-oauth/gpt-5.5).
+
+    ``ask_user`` adds a console AskUser tool so the agent can put a genuinely human decision
+    (e.g. which implementation is the baseline) to the user; enable it only on an interactive
+    terminal."""
     from ...zoo import real_agent_runner
     from ..user_config import llm_defaults
 
     llm = llm_defaults()
     return real_agent_runner(
-        with_search=with_search,
+        with_search=with_search, ask_user=ask_user,
         provider=llm.get("provider"), model=llm.get("model"),
         api_key=llm.get("api_key"), base_url=llm.get("base_url"),
     )
@@ -178,31 +187,40 @@ def add_command(
     ),
     do_bringup: bool = typer.Option(
         False, "--bringup",
-        help="After scaffolding, run the bring-up agent to make the baseline run "
-             "(needs a configured LLM provider / API key).",
+        help="Force the bring-up agent (implement/wire the baseline + write the eval). "
+             "A natural-language query runs bring-up by default; use this to also trigger it "
+             "for a bare URL/HF spec. Needs a configured LLM provider / API key.",
     ),
     max_turns: int = typer.Option(
         100, "--max-turns", help="Agent turn budget (discovery / bring-up).",
     ),
 ) -> None:
-    """Collect a benchmark into the zoo from a query or a URL.
+    """Turn a one-line request into a runnable draft task.
 
-    A natural-language query is resolved by the **discovery agent** (it searches GitHub /
-    HuggingFace / arXiv, judges candidates, and proposes one — needs a configured provider).
-    A URL skips discovery. Either way the spine clones into the global cache and scaffolds a
-    draft; ``--bringup`` then has an agent make the baseline run. Acceptance stays human.
+    A **natural-language request** is handled by an agent end-to-end: it searches GitHub /
+    HuggingFace / arXiv, and — on an interactive terminal — asks you which dataset to use and
+    where the baseline should come from (harvest an existing one, implement the method you
+    described, or find one online). It then acquires the data and brings up a *runnable draft*
+    (baseline + eval + README + PROVENANCE). It does NOT force-run the eval — a real run may
+    need your served model / API key. A bare URL/HF spec skips discovery and just acquires +
+    scaffolds; add ``--bringup`` to also bring up its baseline. Acceptance stays human.
     """
-    # ── Natural-language query → discovery agent → a chosen URL ──────────────
-    if select_acquirer(spec) is None:
-        import asyncio
-        import tempfile
+    import asyncio
+    import sys
 
-        from ...zoo import discover
+    interactive = sys.stdin.isatty()
+    request = spec                          # the user's original words (shapes an implemented baseline)
+    from_query = select_acquirer(spec) is None
+    baseline_plan: dict = {}
+
+    # ── Natural-language request → discovery agent → a chosen source ──────────
+    if from_query:
+        import tempfile
 
         typer.secho(f"searching for a benchmark matching: {spec!r} …", fg=typer.colors.CYAN)
         try:
             disc = asyncio.run(discover(
-                spec, run_agent=_user_runner(with_search=True),
+                spec, run_agent=_user_runner(with_search=True, ask_user=interactive),
                 work_dir=Path(tempfile.mkdtemp(prefix="arbor-discover-")),
                 max_turns=max_turns,
             ))
@@ -217,9 +235,13 @@ def add_command(
                         fg=typer.colors.RED, err=True)
             raise typer.Exit(code=1)
         choice = disc.choice or {}
+        baseline_plan = disc.baseline_plan
         typer.secho(f"\nchosen: {disc.name}  →  {disc.url}", fg=typer.colors.GREEN)
         typer.echo(f"  metric:   {choice.get('metric', '?')}")
         typer.echo(f"  baseline: {choice.get('baseline', '?')}")
+        if baseline_plan:
+            typer.echo(f"  plan:     baseline via {baseline_plan.get('source', '?')} — "
+                       f"{baseline_plan.get('detail', '')}")
         typer.echo(f"  why:      {choice.get('why', '?')}")
         if not assume_yes and not typer.confirm("\nacquire this benchmark?", default=True):
             raise typer.Exit(code=0)
@@ -247,17 +269,19 @@ def add_command(
     typer.echo(f"structural verify: {len(fails)} fail(s) "
                f"(eval not run — the draft eval is a stub)")
 
-    if do_bringup and result.draft_pack_dir:
-        import asyncio
-
-        from ...zoo import bringup
-
+    # A query runs bring-up by default (producing a runnable draft is the whole point); a bare
+    # URL/HF spec only brings up when asked with --bringup.
+    if (from_query or do_bringup) and result.draft_pack_dir:
         materials = result.acquired.materials_dir if result.acquired else None
         typer.secho("\nbringing up the baseline (agent) …", fg=typer.colors.CYAN)
         try:
             br = asyncio.run(bringup(
-                result.draft_pack_dir, run_agent=_user_runner(with_search=False),
-                materials_dir=materials, max_turns=max_turns,
+                result.draft_pack_dir,
+                run_agent=_user_runner(with_search=True, ask_user=interactive),
+                materials_dir=materials,
+                instruction=request if from_query else "",
+                baseline_plan=baseline_plan,
+                max_turns=max_turns,
             ))
         except Exception as exc:  # noqa: BLE001 — surface provider/setup errors clearly
             typer.secho(f"  bring-up could not start: {exc}", fg=typer.colors.RED, err=True)
@@ -265,11 +289,14 @@ def add_command(
             raise typer.Exit(code=1) from exc
         for note in br.notes:
             typer.echo(f"  • {note}")
-        typer.secho(
-            f"  bring-up {'succeeded' if br.ok else 'incomplete'} "
-            f"(dev score: {br.dev_score})",
-            fg=typer.colors.GREEN if br.ok else typer.colors.YELLOW,
-        )
+        if br.ran:
+            typer.secho(f"  bring-up {'ok' if br.ok else 'incomplete'} — eval ran "
+                        f"(dev score: {br.dev_score})",
+                        fg=typer.colors.GREEN if br.ok else typer.colors.YELLOW)
+        else:
+            typer.secho(f"  {'runnable draft ready' if br.ok else 'bring-up incomplete'} — "
+                        f"eval not run here (needs your model / API key)",
+                        fg=typer.colors.GREEN if br.ok else typer.colors.YELLOW)
 
     typer.secho("\nstill to do (drafting is automated, acceptance is not):",
                 fg=typer.colors.YELLOW)

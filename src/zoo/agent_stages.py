@@ -39,9 +39,9 @@ class AgentRunner(Protocol):
 
 
 BRINGUP_SYSTEM_PROMPT = """\
-You are a benchmark bring-up assistant. You turn an acquired research repo into a runnable
-Arbor benchmark in the current directory. You write the *measurement plumbing and a working
-baseline* — never an optimized solution.
+You are a benchmark bring-up assistant. You turn acquired materials (a research repo, a
+dataset) into a runnable Arbor benchmark in the current directory. You write the *measurement
+plumbing and a working baseline* — never an optimized solution.
 
 Produce, in the current directory:
   * a runnable eval: `bash eval.sh dev|test` (or `python eval.py --split dev|test`) prints
@@ -54,9 +54,21 @@ Produce, in the current directory:
   * `PROVENANCE.md` — for humans: Source, Setup & environment, Baseline, Contamination
     assessment, Caveats.
 
+The "baseline" is the *starting point Arbor will optimize*, NOT a SOTA method. It may come
+from three places — follow the baseline plan you are given, and use `AskUser` if it is unclear:
+  * harvest   — take a simple runnable baseline already in the repo (direct generation,
+    naive RAG, an earlier system) rather than the repo's headline method;
+  * implement — write a baseline to the user's described method/instruction (you are given it
+    below as the user's request);
+  * web       — find an existing baseline implementation online and adapt it.
+
 Use the acquired source materials at the path you are told. Install dependencies as needed.
-You are DONE only when `bash eval.sh dev` prints a `score:` line and `arbor benchmark verify .`
-would pass. If you are blocked, write what you have and explain the blocker clearly.
+You are DONE when the four artifacts exist, `arbor benchmark verify .` would pass, and the
+eval is *runnable*. Do NOT block on actually running it to completion: a real run may need a
+served model, an API key, or a search key the user has not set up. If you can run the eval
+cheaply (e.g. CPU-only), do so to sanity-check it; otherwise make it runnable, document the
+exact setup needed in README + PROVENANCE, and stop — leaving a runnable draft is success.
+If you are blocked on something you cannot resolve, write what you have and explain it clearly.
 """
 
 
@@ -66,6 +78,7 @@ class BringupResult:
 
     transcript: str = ""
     dev_score: float | None = None
+    ran: bool = False                      # the eval actually ran and produced a score
     verify: list[VerifyResult] = field(default_factory=list)
     ok: bool = False
     notes: list[str] = field(default_factory=list)
@@ -102,21 +115,37 @@ async def bringup(
     *,
     run_agent: AgentRunner,
     materials_dir: Path | None = None,
+    instruction: str = "",
+    baseline_plan: dict[str, Any] | None = None,
     max_turns: int = 40,
     eval_timeout: int = 600,
 ) -> BringupResult:
-    """Run the bring-up agent in *pack_dir*, then check its work (eval runs + verify).
+    """Run the bring-up agent in *pack_dir*, then check its work.
 
     *run_agent* does the actual agent work (real: an :class:`Agent`; in tests: a fake that
     writes the files). *materials_dir* is the acquired source the agent should draw from.
+    *instruction* is the user's original natural-language request (so a baseline can be
+    *implemented* to their described method), and *baseline_plan* records where the baseline
+    should come from (harvest / implement / web).
+
+    Success is a **runnable draft**: the artifacts are present and the structural verify
+    passes. Actually running the eval is best-effort — a real run may need a served model /
+    API key the user hasn't set up — so a non-running eval is noted, not a failure.
     """
     result = BringupResult()
-    where = f"\n\nThe acquired source materials are at: {materials_dir}" if materials_dir else ""
-    task = (
-        f"Bring up the benchmark in this directory ({pack_dir}). Make the baseline run and "
-        f"the eval print a `score:` line on dev and test, and write README.md + "
-        f"PROVENANCE.md.{where}"
-    )
+    parts = [f"Bring up the benchmark in this directory ({pack_dir}). Produce a runnable "
+             f"baseline and an eval that prints a `score:` line on dev and test, plus "
+             f"README.md + PROVENANCE.md."]
+    if materials_dir:
+        parts.append(f"The acquired source materials are at: {materials_dir}")
+    if instruction:
+        parts.append(f"The user's original request (use it to shape/implement the baseline):\n"
+                     f"{instruction}")
+    if baseline_plan:
+        src = baseline_plan.get("source", "?")
+        detail = baseline_plan.get("detail", "")
+        parts.append(f"Baseline plan — source={src}: {detail}")
+    task = "\n\n".join(parts)
     try:
         result.transcript = await run_agent(
             cwd=pack_dir, system_prompt=BRINGUP_SYSTEM_PROMPT, task=task, max_turns=max_turns)
@@ -124,13 +153,16 @@ async def bringup(
         result.notes.append(f"agent run failed: {exc}")
         return result
 
-    # ── success check: the eval actually runs and scores, and the pack verifies ──
+    # ── success check: the pack verifies (a runnable draft); running the eval is best-effort ──
     result.dev_score, eval_out = _run_eval_dev(pack_dir, eval_timeout)
-    if result.dev_score is None:
-        result.notes.append(f"eval did not print a parseable score:\n{eval_out}")
+    result.ran = result.dev_score is not None
+    if not result.ran:
+        result.notes.append(
+            "eval did not produce a score here — left as a runnable draft (a real run may "
+            f"need a served model / API key):\n{eval_out}")
     result.verify = verify_pack(pack_dir)
     verify_ok = not any(r.status == "fail" for r in result.verify)
-    result.ok = result.dev_score is not None and verify_ok
+    result.ok = verify_ok
     if not verify_ok:
         result.notes.append("structural verify still has failures")
     return result
@@ -153,8 +185,25 @@ PapersWithCode, and leaderboards. For each candidate, judge:
 Prefer a GitHub repo that already contains an eval + baseline. **Be efficient: as soon as
 you have identified one suitable repo and can name its benchmark(s) and baseline(s) — usually
 after reading the paper and the repo README — STOP and output your choice. Do not
-exhaustively clone and grep.** End your reply with a single fenced JSON block describing your
-choice (and nothing after it):
+exhaustively clone and grep.**
+
+The "baseline" is the *starting point Arbor will optimize*, NOT the repo's headline method.
+A repo that proposes a method usually also ships simpler baselines (direct generation, naive
+RAG, an earlier system); for Arbor those simpler baselines are the harvestable ones, because
+they leave headroom to optimize. Name a concrete baseline implementation (a runnable script),
+not a published number. When which one to treat as the baseline is genuinely the user's call
+and an `AskUser` tool is available, ask them rather than guessing.
+
+The request may name a *work* that uses several datasets/benchmarks (e.g. "get me the
+datasets in WebThinker"). In that case enumerate the datasets it uses and, if an `AskUser`
+tool is available, ask the user **which single dataset** they want — then resolve that one.
+Also decide where the baseline will come from and record it as `baseline_plan.source`:
+  * "harvest"   — a runnable baseline script already in the repo,
+  * "implement" — write one to the user's described method/instruction (e.g. "design xxx"),
+  * "web"       — find an existing implementation online.
+Ask the user (AskUser) when the baseline source is genuinely their call.
+
+End your reply with a single fenced JSON block describing your choice (and nothing after it):
 
 ```json
 {
@@ -162,6 +211,7 @@ choice (and nothing after it):
   "source": {"kind": "git", "url": "https://github.com/owner/repo"},
   "metric": "what is optimized, and whether higher/lower is better",
   "baseline": "where/what the harvestable baseline is",
+  "baseline_plan": {"source": "harvest", "detail": "which script / method / search to use"},
   "why": "one or two sentences on why this fits the request"
 }
 ```
@@ -187,6 +237,12 @@ class DiscoveryResult:
     @property
     def name(self) -> str | None:
         return (self.choice or {}).get("name")
+
+    @property
+    def baseline_plan(self) -> dict[str, Any]:
+        """How/where the baseline should come from: {source: harvest|implement|web, detail}."""
+        plan = (self.choice or {}).get("baseline_plan")
+        return plan if isinstance(plan, dict) else {}
 
 
 def _extract_json(text: str) -> dict[str, Any] | None:
@@ -246,6 +302,7 @@ async def discover(
 def real_agent_runner(
     *,
     with_search: bool = False,
+    ask_user: bool = False,
     provider: str | None = None,
     model: str | None = None,
     api_key: str | None = None,
@@ -254,8 +311,11 @@ def real_agent_runner(
     """Build the real :class:`Agent`-backed runner. Needs a configured provider / API key.
 
     With ``with_search=True`` the agent also gets keyless web search + fetch tools
-    (alphaXiv + Jina) so it can browse for benchmarks. Heavy imports are deferred so
-    importing :mod:`arbor.zoo` stays light.
+    (alphaXiv + Jina) so it can browse for benchmarks. With ``ask_user=True`` it gets a
+    console-backed :class:`~arbor.zoo.ask_tool.ConsoleAskUserTool` so it can put a genuinely
+    human decision (e.g. which implementation is the baseline) to the user at the terminal —
+    only enable this when stdin is interactive. Heavy imports are deferred so importing
+    :mod:`arbor.zoo` stays light.
     """
     async def _run(*, cwd: Path, system_prompt: str, task: str, max_turns: int) -> str:
         from arbor.core import Agent, AgentConfig, create_provider
@@ -269,6 +329,9 @@ def real_agent_runner(
         cfg = AgentConfig(cwd=str(cwd), max_turns=max_turns, auto_git=False, **llm_kw)
         prov = create_provider(cfg)
         tools = list(get_all_tools(cwd=str(cwd), config=cfg))
+        if ask_user:
+            from .ask_tool import ConsoleAskUserTool
+            tools.append(ConsoleAskUserTool(cwd=str(cwd)))
         if with_search:
             from arbor.coordinator.config import SearchConfig
             from arbor.core.tools.web.factory import (

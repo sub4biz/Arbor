@@ -45,6 +45,27 @@ def test_discover_no_json_is_not_ok(tmp_path: Path) -> None:
     assert any("no JSON" in n for n in res.notes)
 
 
+def test_discover_captures_baseline_plan(tmp_path: Path) -> None:
+    reply = (
+        '```json\n'
+        '{"name": "gpqa", "source": {"kind": "hf", "url": "Idavidrein/gpqa"}, '
+        '"metric": "accuracy, higher is better", "baseline": "naive RAG", '
+        '"baseline_plan": {"source": "implement", "detail": "write a naive RAG baseline"}, '
+        '"why": "user wants to climb GPQA"}\n```'
+    )
+    res = asyncio.run(discover("climb GPQA with a naive RAG baseline",
+                               run_agent=_fake_runner(reply), work_dir=tmp_path / "w"))
+    assert res.ok
+    assert res.baseline_plan == {"source": "implement", "detail": "write a naive RAG baseline"}
+
+
+def test_discover_baseline_plan_defaults_empty(tmp_path: Path) -> None:
+    # The KernelBench reply has no baseline_plan → property is an empty dict, not None.
+    res = asyncio.run(discover("a kernel benchmark",
+                               run_agent=_fake_runner(_CHOICE), work_dir=tmp_path / "w"))
+    assert res.baseline_plan == {}
+
+
 def test_discover_null_source_is_not_ok(tmp_path: Path) -> None:
     reply = '```json\n{"name": null, "source": null, "why": "nothing suitable found"}\n```'
     res = asyncio.run(discover("obscure", run_agent=_fake_runner(reply), work_dir=tmp_path / "w"))

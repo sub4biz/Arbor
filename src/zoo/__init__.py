@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from .acquire import Acquired, Acquirer, GitRepoAcquirer, Sources, select_acquirer
 from .agent_stages import BringupResult, DiscoveryResult, bringup, discover, real_agent_runner
+from .ask_tool import ConsoleAskUserTool
 from .cache import Manifest, benchmark_cache_dir, cache_root
 from .collect import CollectResult, collect
 from .pack import (
@@ -32,6 +33,7 @@ __all__ = [
     "Acquirer",
     "BringupResult",
     "CollectResult",
+    "ConsoleAskUserTool",
     "DiscoveryResult",
     "GitRepoAcquirer",
     "Manifest",

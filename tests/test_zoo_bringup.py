@@ -43,20 +43,24 @@ def test_bringup_success(tmp_path: Path) -> None:
     pack.mkdir()
     res = asyncio.run(bringup(pack, run_agent=_fake_runner(_good_files("0.5"))))
     assert res.dev_score == 0.5
+    assert res.ran
     assert res.ok
     assert not [r for r in res.verify if r.status == "fail"]
     assert res.transcript == "bring-up done"
 
 
-def test_bringup_no_score_is_incomplete(tmp_path: Path) -> None:
+def test_bringup_no_score_still_drafts(tmp_path: Path) -> None:
+    # A non-running eval is a runnable draft, not a failure (we don't force-run): ok stays
+    # True (artifacts verify), but ran is False and a note explains why.
     pack = tmp_path / "p"
     pack.mkdir()
     files = _good_files()
     files["eval.sh"] = "#!/usr/bin/env bash\necho 'nothing here'\n"
     res = asyncio.run(bringup(pack, run_agent=_fake_runner(files)))
     assert res.dev_score is None
-    assert not res.ok
-    assert any("score" in n for n in res.notes)
+    assert not res.ran
+    assert res.ok
+    assert any("runnable draft" in n for n in res.notes)
 
 
 def test_bringup_failed_verify_is_incomplete(tmp_path: Path) -> None:
@@ -67,6 +71,27 @@ def test_bringup_failed_verify_is_incomplete(tmp_path: Path) -> None:
     res = asyncio.run(bringup(pack, run_agent=_fake_runner(files)))
     assert not res.ok
     assert any(r.status == "fail" for r in res.verify)
+
+
+def test_bringup_threads_instruction_and_plan(tmp_path: Path) -> None:
+    # The user's request and the baseline plan must reach the agent's task text.
+    pack = tmp_path / "p"
+    pack.mkdir()
+    seen: dict = {}
+
+    async def _spy(*, cwd: Path, system_prompt: str, task: str, max_turns: int) -> str:
+        seen["task"] = task
+        for rel, content in _good_files().items():
+            (cwd / rel).write_text(content)
+        return "ok"
+
+    asyncio.run(bringup(
+        pack, run_agent=_spy,
+        instruction="climb GPQA, design a self-consistency method",
+        baseline_plan={"source": "implement", "detail": "self-consistency over 5 samples"},
+    ))
+    assert "self-consistency method" in seen["task"]
+    assert "implement" in seen["task"] and "5 samples" in seen["task"]
 
 
 def test_bringup_surfaces_agent_error(tmp_path: Path) -> None:
