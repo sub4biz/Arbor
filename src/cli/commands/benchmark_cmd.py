@@ -49,6 +49,20 @@ def _render(r: VerifyResult) -> None:
             typer.secho(f"         hint: {r.hint}", fg=typer.colors.RED, err=True)
 
 
+def _user_runner(*, with_search: bool):
+    """Build an agent runner that uses the user's configured provider (~/.arbor/config.yaml),
+    so the collection agents inherit the same LLM as `arbor run` (e.g. openai-oauth/gpt-5.5)."""
+    from ...zoo import real_agent_runner
+    from ..user_config import llm_defaults
+
+    llm = llm_defaults()
+    return real_agent_runner(
+        with_search=with_search,
+        provider=llm.get("provider"), model=llm.get("model"),
+        api_key=llm.get("api_key"), base_url=llm.get("base_url"),
+    )
+
+
 @benchmark_app.command("verify")
 def verify_command(
     pack_dir: Path = typer.Argument(
@@ -168,7 +182,7 @@ def add_command(
              "(needs a configured LLM provider / API key).",
     ),
     max_turns: int = typer.Option(
-        40, "--max-turns", help="Agent turn budget for --bringup.",
+        100, "--max-turns", help="Agent turn budget (discovery / bring-up).",
     ),
 ) -> None:
     """Collect a benchmark into the zoo from a query or a URL.
@@ -183,13 +197,14 @@ def add_command(
         import asyncio
         import tempfile
 
-        from ...zoo import discover, real_agent_runner
+        from ...zoo import discover
 
         typer.secho(f"searching for a benchmark matching: {spec!r} …", fg=typer.colors.CYAN)
         try:
             disc = asyncio.run(discover(
-                spec, run_agent=real_agent_runner(with_search=True),
+                spec, run_agent=_user_runner(with_search=True),
                 work_dir=Path(tempfile.mkdtemp(prefix="arbor-discover-")),
+                max_turns=max_turns,
             ))
         except Exception as exc:  # noqa: BLE001
             typer.secho(f"  discovery could not start: {exc}", fg=typer.colors.RED, err=True)
@@ -235,13 +250,13 @@ def add_command(
     if do_bringup and result.draft_pack_dir:
         import asyncio
 
-        from ...zoo import bringup, real_agent_runner
+        from ...zoo import bringup
 
         materials = result.acquired.materials_dir if result.acquired else None
         typer.secho("\nbringing up the baseline (agent) …", fg=typer.colors.CYAN)
         try:
             br = asyncio.run(bringup(
-                result.draft_pack_dir, run_agent=real_agent_runner(),
+                result.draft_pack_dir, run_agent=_user_runner(with_search=False),
                 materials_dir=materials, max_turns=max_turns,
             ))
         except Exception as exc:  # noqa: BLE001 — surface provider/setup errors clearly

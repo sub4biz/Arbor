@@ -150,8 +150,11 @@ PapersWithCode, and leaderboards. For each candidate, judge:
   * compute fit and license — can it be cloned and run, and is it redistributable?
   * is it a representative / actively-used benchmark for the request?
 
-Prefer a GitHub repo that already contains an eval + baseline. End your reply with a single
-fenced JSON block describing your choice (and nothing after it):
+Prefer a GitHub repo that already contains an eval + baseline. **Be efficient: as soon as
+you have identified one suitable repo and can name its benchmark(s) and baseline(s) — usually
+after reading the paper and the repo README — STOP and output your choice. Do not
+exhaustively clone and grep.** End your reply with a single fenced JSON block describing your
+choice (and nothing after it):
 
 ```json
 {
@@ -207,7 +210,7 @@ async def discover(
     *,
     run_agent: AgentRunner,
     work_dir: Path,
-    max_turns: int = 24,
+    max_turns: int = 100,
 ) -> DiscoveryResult:
     """Run the discovery agent on a natural-language *query*; return the chosen source.
 
