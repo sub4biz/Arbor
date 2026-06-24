@@ -89,6 +89,20 @@ def test_bad_metric_direction_fails(tmp_path: Path) -> None:
     assert r.status == "fail" and "metric.direction" in r.message
 
 
+def test_frozen_valid_passes_and_surfaces(tmp_path: Path) -> None:
+    c = copy.deepcopy(_CONTRACT)
+    c["frozen"] = {"model": "gpt-x", "budget": "1h"}
+    r = _by_name(verify_pack(_build(tmp_path, contract=c)))["contract"]
+    assert r.status == "pass" and "freeze" in r.message
+
+
+def test_frozen_malformed_fails(tmp_path: Path) -> None:
+    c = copy.deepcopy(_CONTRACT)
+    c["frozen"] = "gpt-x"  # must be a mapping
+    r = _by_name(verify_pack(_build(tmp_path, contract=c)))["contract"]
+    assert r.status == "fail" and "frozen" in r.message
+
+
 # ── sections ──────────────────────────────────────────────────────────────────
 
 def test_missing_readme_section_fails(tmp_path: Path) -> None:

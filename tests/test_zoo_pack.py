@@ -86,6 +86,15 @@ def test_load_contract_absent_is_not_present(tmp_path: Path) -> None:
     assert load_contract(pack).present is False
 
 
+def test_load_contract_frozen_optional(tmp_path: Path) -> None:
+    # absent → empty dict
+    assert load_contract(_make_pack(tmp_path, "a")).frozen == {}
+    # present → loaded
+    fm = _FM.replace("edit: [solution.py]\n", "edit: [solution.py]\nfrozen: {model: gpt-x}\n")
+    pack = _make_pack(tmp_path, "b", readme=fm)
+    assert load_contract(pack).frozen == {"model": "gpt-x"}
+
+
 def test_discover_skips_underscore_and_non_packs(tmp_path: Path) -> None:
     _make_pack(tmp_path, "real")
     _make_pack(tmp_path, "_template")

@@ -37,6 +37,14 @@ requires_numpy = pytest.mark.skipif(
 requires_zoo = pytest.mark.skipif(not _ZOO.is_dir(), reason="arbor-zoo not present")
 
 
+@pytest.fixture(autouse=True)
+def _stable_knn_timing(monkeypatch):
+    """Raise the median-of-N timing reps + instances so the speedup ratio is stable
+    under CI load (the timing metric is otherwise noisy run-to-run)."""
+    monkeypatch.setenv("KNN_TRIALS", "9")
+    monkeypatch.setenv("KNN_INSTANCES", "5")
+
+
 @requires_zoo
 @requires_numpy
 def test_algotune_knn_verifies_clean() -> None:

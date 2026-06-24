@@ -49,6 +49,7 @@ class Contract:
     splits: dict[str, Any] = field(default_factory=dict)    # {kind, dev, test}
     baseline: dict[str, Any] = field(default_factory=dict)  # {score, tolerance, kind}
     edit: list[str] = field(default_factory=list)           # editable globs (1+); rest is protected
+    frozen: dict[str, Any] = field(default_factory=dict)    # {model, budget} — the freeze axis (optional)
     present: bool = False                                    # was there front-matter at all?
 
 
@@ -86,6 +87,7 @@ def load_contract(pack_dir: Path) -> Contract:
         splits=data.get("splits", {}) or {},
         baseline=data.get("baseline", {}) or {},
         edit=data.get("edit", []) or [],
+        frozen=data.get("frozen", {}) or {},
         present=True,
     )
 

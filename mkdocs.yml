@@ -39,6 +39,11 @@ theme:
     - search.suggest
     - search.highlight
 
+# Internal dev/design notes live under docs/dev/ but are not part of the
+# published site (they cross-link each other and would trip strict link checks).
+exclude_docs: |
+  dev/
+
 nav:
   - Home: index.md
   - Getting Started:
