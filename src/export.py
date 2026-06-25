@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import html
 import json
+import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -62,8 +63,9 @@ def resolve_session_dir(session: Path, cwd: Path | None = None) -> Path:
             stable = _stable_arbor_base(cwd)
             if stable != cwd:
                 candidates.append(stable / CONFIG_DIR_NAME / "sessions" / str(session))
-        except Exception:
-            pass
+        except Exception as exc:  # best-effort: never block session lookup
+            logging.getLogger(__name__).debug(
+                "stable-base session lookup skipped: %s", exc)
 
     for path in candidates:
         if path.exists() and path.is_dir():

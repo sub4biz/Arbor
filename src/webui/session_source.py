@@ -129,7 +129,9 @@ def _best_score_history(
         fin = timing.get(n.get("id"), {}).get("finished_at") if isinstance(timing, dict) else None
         # Nodes without a recorded finish still count — sort them last but stable.
         points.append((float(fin) if isinstance(fin, (int, float)) else float("inf"), float(score)))
-    points.sort(key=lambda p: p[0])
+    # Order by finish time; tiebreak on score so legacy sessions with no timing
+    # (all keyed at +inf) still draw in a stable, deterministic order.
+    points.sort(key=lambda p: (p[0], p[1]))
     history: list[float] = []
     best: float | None = None
     for _, score in points:
