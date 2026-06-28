@@ -1,215 +1,78 @@
 # Roadmap
 
-This is a direction document, not a release schedule. It lists the directions we
-want to push on and a few concrete ideas under each. Items move, merge, or get
-dropped as we learn.
+This document records the directions we plan to push Arbor in: a few categories of open
+problems and our current preliminary thinking on each. These problems and ideas will be
+adjusted, merged, or dropped as the team's understanding deepens — contributions and
+suggestions are welcome.
 
-## Positioning
+## Direction 1 — Core capability
 
-A few autonomous-research systems already overlap with parts of this plan.
-[AutoSOTA](https://github.com/tsinghua-fib-lab/AutoSOTA) is the closest: a
-closed-loop system that reviews literature, edits research code, runs
-experiments, and maintains a per-paper leaderboard across 100+ papers organized
-by domain, with reproduced baselines and tamper-protected evals.
+### 1. Better long-run process management
 
-That overlap is real, so we are explicit about where Arbor is *not* trying to be a
-second "auto-optimize published papers" leaderboard:
+Arbor currently maintains the entire hypothesis tree with a single Coordinator, which can
+degrade over longer research horizons. We plan to improve its context management so that
+the key information accumulated during a long run isn't gradually distorted or lost.
 
-- The value we want to build is a **reusable, checkable benchmark format** anyone
-  can re-run, not a catalog of our own wins.
-- We lean on **held-out discipline** — a change is kept only if it clears a margin
-  on a protected test split — over "produced a higher number".
-- We treat the benchmark collection first as **our own regression harness** for the
-  Coordinator/Executor, and only second as something public-facing.
+### 2. Idea quality assessment
 
----
+The novelty and feasibility of a proposed idea currently rest mainly on the base model's
+own ability, with no explicit external feedback to supervise it. We are considering
+introducing a critic-style role that gives candidate ideas an independent assessment, to
+raise the quality of this step.
 
-## Direction 1 — Core functionality
+### 3. Self-evolution
 
-### 1.1 Search and literature-grounded ideation ✅ *(shipped)*
+Arbor currently optimizes around a single benchmark, and the experience it gains is hard
+to transfer to similar or same-domain tasks. We plan to add the ability to export research
+trajectories, and on top of that to extract and consolidate reusable skills and experience.
 
-Originally search lived in an isolated `SearchAgent`; idea generation and the
-Coordinator could not search the open web. That kept benchmark runs fair — the
-system couldn't copy a finished idea off the web — but it was too strict for real
-research, where you read prior work before proposing a direction.
+### 4. Support for composite optimization objectives
 
-Shipped (default-off, so benchmark runs stay fair). See the
-[Search & External Knowledge](search.md) guide for usage:
+Arbor's optimization objective is currently limited to a scalar score. We are considering
+support for more composite objective forms — such as rubric- and LLM-judge-based scoring
+and multi-objective optimization — and the comparability and anti-gaming problems such
+objectives bring.
 
-- **Grounded ideation** (`search.grounded_ideation`, default off) — the
-  coordinator gets a `ResearchSearch` tool during ideation (intents:
-  related-work / survey / lookup / explore).
-- **Separation, not prohibition** — the grounding lane and the novelty-audit lane
-  don't share state; a source that shapes an idea is recorded on the node's
-  `grounding` field, separate from the audit's `related_work`.
-- **Pluggable backends** behind `search.backends`, fanned out and merged:
-  alphaXiv + Jina (keyless), Serper + Exa REST (keyed), **Exa via MCP** (keyless),
-  and the legacy self-hosted endpoint. Keyless page reading via the Jina reader
-  (raw-`requests` fallback), no browse endpoint needed.
-- **Full-text and PDF ingestion** — the grounded lane reads with a larger token
-  budget (`research_visit_tokens`) and parses PDFs, so a model can read a paper's
-  method/results sections, not just its abstract.
+### 5. Stronger agentic research ability
 
-Still open: enforcing the per-search round/visit caps as a hard cost bound, and
-surfacing per-run search cost (tracked under [1.3](#13-cost-and-scheduling)).
-
-### 1.2 Evaluation discipline ✅ *(shipped)*
-
-Shipped:
-
-- **Split provenance** — every score is tagged with the split it came from
-  (`dev`/`test`) at the data-model level and rendered labeled in REPORT.md, the
-  CLI dashboard, and the WebUI. The verified B_test score is recorded on the node
-  and trunk meta automatically at merge.
-- **Tamper-proof evals** — protected paths are hash-verified at runtime, not only
-  at merge. Each executor worktree gets a SHA-256 manifest of its protected files
-  plus best-effort OS read-only; any mid-run change discards the node's dev score
-  and blocks the merge (emitting `eval.protected_tamper`). This closes the gap
-  where an executor could inflate B_dev by writing to `data/`/`evaluation/`.
-- **Contamination checks** — a declarative `eval_contract.contamination` block
-  (release date, `is_public`, canaries) drives a non-blocking preflight warning
-  and an INIT-time probe (`eval.contamination_assessed`, recorded in tree meta).
-  The declarative heuristic + canary scan ship now; an LLM membership-inference
-  probe is a planned follow-up.
-
-See the [Plugins](plugins.md) guide for the `contamination` block and runtime
-protected-path enforcement.
-
-### 1.3 Cost and scheduling
-
-- Budget tiers (smoke → pilot → full) so larger sweeps stay predictable.
-- Per-backend / per-run cost accounting surfaced before a run starts, not after.
-
----
+Let the agent autonomously gather more experiment information as a run progresses, rather
+than being confined to a pre-defined metric, giving subsequent decisions a fuller basis.
 
 ## Direction 2 — External resources
 
-### 2.1 Benchmark zoo, organized by domain 🚧 *(format + tooling shipped; collection growing)*
+### 1. Extend to more diverse long-horizon optimization settings
 
-A curated collection of tasks in one standard format, grouped by domain (e.g.
-vision, NLP, time series, optimization), each using a published paper's result as
-the baseline to beat. It lives in the repo as `arbor-zoo/`, one folder per
-benchmark, and serves first as Arbor's own regression harness — not a leaderboard
-of our wins.
+The current task format assumes static optimization (a fixed, stateless environment). We
+plan to add tasks that carry environment state, to support optimizing agent harnesses in
+concrete settings such as office work.
 
-Shipped — the Task Pack format, the verifier, and a first reference pack. See the
-[Benchmark Zoo](zoo.md) guide for the full spec and the verifier's check list:
+### 2. Automated environment collection
 
-- **Task Pack format**, one folder per benchmark, with the contract carried in the
-  **README front-matter** (metric, dev/test split, baseline, edit surface) — there
-  is *no separate manifest file*. Alongside it: a runnable baseline (e.g.
-  `solution.py`), a protected eval entrypoint (`eval.sh` / `eval.py`) that prints
-  exactly one `score: <float>` line for `dev`|`test`, an optional protected
-  `task.py` (deterministic `generate_problem` + an *independent* `is_solution`
-  verifier, so "fast but wrong" can't score), and a `PROVENANCE.md` card (source,
-  license, setup/environment, baseline reproduction, contamination, caveats).
-- **`arbor benchmark verify`** gates a pack: front-matter + `PROVENANCE.md` parse
-  and are complete, the eval emits a parseable score on dev and test, the baseline
-  reproduces its claimed number, dev/test are held out, protected paths hold, and
-  the eval is deterministic/offline. Exits non-zero on any failure — an unverified
-  pack does not enter the zoo. **`arbor benchmark list`** indexes a zoo directory
-  (a plain index, not a leaderboard).
-- **Reference pack + scaffolding**:
-  [`algotune_knn`](https://github.com/RUC-NLPIR/Arbor/tree/main/arbor-zoo/algotune_knn)
-  (verified) and a `_template` to copy. Folders prefixed `_` are skipped by tooling.
+Collect and grow a more comprehensive set of benchmark scenarios, covering a range of LLM
+and agent evaluation benchmarks, so that Arbor can support a wider range of optimization
+settings.
 
-Still open:
+## Direction 3 — User experience
 
-- **Grow the collection** to 3–5 high-quality, human-checked packs across distinct
-  task shapes, using `algotune_knn` as the reference. Cap on quality, not count.
-- **`arbor benchmark add`** — semi-automatic conversion: from a one-line request the
-  agent finds the dataset, asks (on an interactive terminal) which dataset to use and
-  where the baseline comes from (harvest an existing one / implement the method you
-  described / find one online), and brings up a runnable draft — gated behind the
-  verifier and a human accept step (draft-automatic, accept-verified — never
-  auto-accepted). The baseline-implementing agent stays separate from the loop that
-  later optimizes it, so evaluation isn't self-certifying. *(Built: discovery +
-  interactive bring-up; bring-up reasoning still maturing.)*
-- **Lower a pack into a [plugin](plugins.md)** for one-line retargeting — the
-  front-matter contract reuses the `plugin` vocabulary (`eval_contract` /
-  `protected_paths`), so it should fall out with little rework (pairs with 2.2).
+### 1. More worked examples and scenarios
 
+The zero-install demo has shipped, but `algotune_knn` is still the only example a newcomer
+can run end to end. We plan to grow it into a small examples gallery covering different
+task types and audiences (e.g. Kaggle / MLE, prompt and harness engineering, small-scale
+training), each with a copy-pasteable command and a short recording, keeping the barrier to
+"runs in minutes on a laptop or a free API key".
 
-### 2.2 Plugin gallery
+### 2. Better export and presentation of a single run
 
-More worked domain plugins beyond `mle_kaggle`, paired with the Task Packs above,
-so retargeting Arbor to a domain is a one-line `plugin:` change.
-
-### 2.3 Search backends ✅ *(shipped)*
-
-The pluggable backends from Direction 1 (alphaXiv, Jina, Serper, Exa REST, Exa
-via MCP, self-hosted endpoint) are also external resources users wire in once and
-reuse across runs. See [1.1](#11-search-and-literature-grounded-ideation-shipped)
-and the [Search guide](search.md).
+There's already `REPORT.md`, HTML export, a live dashboard, and a read-only WebUI — what's
+missing is understanding and comparing a single run. We plan to support comparison across
+runs (diff multiple runs of the same task, or compare idea trees across models / providers),
+add citations (the sources behind each idea) and a cost breakdown to the report, and give
+the benchmark collection a reproducibility view where every entry carries a command you can
+re-run directly.
 
 ---
 
-## Direction 3 — User presentation
-
-### 3.1 Zoo / leaderboard view
-
-A browsable page over the benchmark zoo: per domain, show the paper baseline, the
-Arbor result, the gain, and the exact command to reproduce it. The point is
-reproducibility — every row is something a reader can re-run — not a scoreboard.
-
-### 3.2 Run comparison
-
-- Diff two runs of the same benchmark.
-- Compare Idea Trees across models/providers on the same task.
-
-### 3.3 Reports and export
-
-Build on today's `REPORT.md` and HTML export with citations (the grounding
-sources behind each idea) and a per-run cost breakdown.
-
----
-
-## Direction 4 — Adoption, DX & community
-
-The first three directions grow what Arbor *does*. This one lowers the barrier
-between a curious visitor and a first successful run, and makes the project's
-momentum visible. The goal is a shorter path to the "aha" moment, not more
-surface area.
-
-### 4.1 Live, zero-install demo
-
-`arbor replay --demo --html` already emits a self-contained, dependency-free page
-of a real run. Publish that page (e.g. on GitHub Pages alongside the docs) and
-link it from the top of the README, so a visitor can watch the hypothesis tree
-grow **without installing anything**. One recorded run, refreshed when the
-dashboard changes.
-
-### 4.2 Examples gallery
-
-Today `examples/algotune_knn` is the only end-to-end task a newcomer can run.
-Grow this into a small gallery so different audiences can self-identify, each
-with a copy-pasteable command and a short asciinema recording:
-
-- a Kaggle / MLE-style task (pairs with the `mle_kaggle` plugin),
-- a prompt / harness-engineering task, and
-- a small training / fine-tuning task.
-
-Keep the bar at "runs in minutes on a laptop or a free key", reusing the
-zero-config discipline of `algotune_knn`.
-
-### 4.3 Regular releases and a changelog
-
-Versions are already derived from `v*` tags via setuptools-scm, so the cost of a
-release is low. Cut a release on a predictable cadence with human-readable notes,
-and keep a `CHANGELOG.md` (or GitHub Releases as the source of truth) so the
-project's progress is legible from the outside.
-
-### 4.4 Public roadmap and issue board
-
-Surface this document as a public board (GitHub Projects) and tag tracked work
-with `good first issue` / `help wanted`. Several threads are already
-contribution-shaped — growing the [benchmark zoo](#21-benchmark-zoo-organized-by-domain-format-tooling-shipped-collection-growing)
-to 3–5 packs ([2.1](#21-benchmark-zoo-organized-by-domain-format-tooling-shipped-collection-growing))
-and adding domain plugins ([2.2](#22-plugin-gallery)) — so opening them up turns
-readers into contributors.
-
----
-
-Have an idea or want to own one of these threads? Open a
+Have an idea, or want to own one of these threads? Open a
 [discussion](https://github.com/RUC-NLPIR/Arbor/discussions) or see
 [Contributing](contributing.md).
