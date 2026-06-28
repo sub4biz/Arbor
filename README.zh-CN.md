@@ -3,13 +3,15 @@
 </p>
 
 
-# 基于假设树的面向通用自主科研方法（Toward Generalist Autonomous Research via Hypothesis-Tree Refinement）
+<h1 align="center">🌳 Arbor</h1>
 
+<h3 align="center">在相同算力预算下，效果超越 Claude Code 与 Codex <b>2.5×</b> 的自主科研智能体</h3>
 
 <p align="center">
   <a href="https://arxiv.org/pdf/2606.11926"><img src="https://img.shields.io/badge/Paper-arXiv-B31B1B?style=for-the-badge&logo=arxiv&logoColor=white" alt="Paper"></a>
   <a href="https://github.com/RUC-NLPIR/Arbor"><img src="https://img.shields.io/badge/Code-GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub"></a>
   <a href="https://RUC-NLPIR.github.io/Arbor/"><img src="https://img.shields.io/badge/Project_Page-Live-0E9B9B?style=for-the-badge&logo=githubpages&logoColor=white" alt="Project Page"></a>
+  <a href="https://RUC-NLPIR.github.io/Arbor/demo.html"><img src="https://img.shields.io/badge/Live_Demo-Watch-FF5C8A?style=for-the-badge&logo=githubpages&logoColor=white" alt="Live Demo"></a>
   <a href="https://RUC-NLPIR.github.io/Arbor/docs/"><img src="https://img.shields.io/badge/Docs-Material-526CFE?style=for-the-badge&logo=materialformkdocs&logoColor=white" alt="Docs"></a>
   <a href="https://github.com/RUC-NLPIR/Arbor/discussions"><img src="https://img.shields.io/badge/讨论区-加入-5865F2?style=for-the-badge&logo=github&logoColor=white" alt="Discussions"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-D22128?style=for-the-badge&logo=apache&logoColor=white" alt="License: Apache 2.0"></a>
@@ -19,20 +21,35 @@
   <a href="README.md">English</a> | <b>简体中文</b>
 </p>
 
-**Arbor 是一个自主科研智能体，可以把长周期目标转化为持续累积的搜索过程。** 给它一个基准
-（benchmark）和一个目标，它会提出假设、修改代码、运行真实实验、从结果中学习，并保留那些在
-留出（held-out）数据上经得起验证的改进。不同于“一次性尝试、过后即弃”的做法，Arbor 会逐步生长出一棵
-**假设树**：每个想法都是一根分支，失败则剪枝，成功则保留；洞见会沿树反向传播，让后续想法
-从更可靠的起点出发。
+<p align="center">
+  <i>给 Arbor 一个基准和一个目标。它会提出假设、修改代码、运行真实实验，只保留经得起留出
+  数据验证的改进——生长出一棵<b>假设树</b>，而不是过后即弃、忘记失败的教训。</i>
+</p>
 
-更多详情，请访问我们的[项目主页](https://ruc-nlpir.github.io/Arbor/)并阅读[论文](https://arxiv.org/pdf/2606.11926)。如需详细的使用说明，请参阅[文档](https://ruc-nlpir.github.io/Arbor/docs/)。🧭 你也可以根据自己的环境和工作流选择使用 [CLI 版本或技能套件版本](https://claude.ai/chat/e7121091-ce2c-4970-a60f-16b54c453729#-cli-与技能套件版本)。
+> **▶️ 30 秒上手——无需 API key，无需配置：**
+>
+> ```bash
+> pip install arbor-agent && arbor replay --demo   # 实时观看假设树的生长过程
+> ```
+>
+> 或者**现在就在浏览器里看**——无需安装任何东西：**[▶️ 在线 Demo](https://RUC-NLPIR.github.io/Arbor/demo.html)**。
+
+### 🏆 一个控制器，六项任务——全部赢下留出测试集
+
+| 任务 | 指标 | Claude Code | Codex | **Arbor** |
+| --- | --- | :---: | :---: | :---: |
+| BrowseComp | acc ↑ | 53.33 | 50.00 | **67.67** |
+| Terminal-Bench 2.0 | pass ↑ | 71.70 | 73.59 | **77.36** |
+| Math-Reasoning Data | gap ↑ | 8.33 | 6.25 | **20.83** |
+
+外加 **MLE-Bench Lite 上 86.36% Any-Medal**（GPT-5.5）。→ [查看全部六项任务](#-实验结果) · [项目主页](https://ruc-nlpir.github.io/Arbor/) · [论文](https://arxiv.org/pdf/2606.11926) · [文档](https://ruc-nlpir.github.io/Arbor/docs/)
 
 ## 📣 最新动态
 
-- **2026-06** — **内置文献检索与想法新颖性审查。** Arbor 现在可以通过 [alphaXiv](https://www.alphaxiv.org) 公共 API 把研究建立在已有工作之上——零配置，无需搜索端点或密钥。动手前用 `arbor idea-check "<你的想法>"` 审查任意想法的新颖性，或让 Coordinator 自动为每个新分支把关。详见[文献检索与新颖性审查](#-文献检索与新颖性审查)。🔎
-- **2026-06** — Arbor 被美国知名科技媒体 [VentureBeat](https://venturebeat.com/) 报道：[《New AI optimization framework beats Claude Code and Codex by 2.5x on the same compute budget》](https://venturebeat.com/orchestration/new-ai-optimization-framework-beats-claude-code-and-codex-by-2-5x-on-the-same-compute-budget)。📰
-- **2026-06** — Arbor 原生 CLI 运行时与智能体技能套件（Codex / Claude Code）正式发布。🚀
-- **2026-06** — Arbor 论文在 [arXiv](https://arxiv.org/abs/2606.11926) 发布。🎉
+- **2026-06-22** — **内置文献检索与想法新颖性审查。** Arbor 现在可以通过 [alphaXiv](https://www.alphaxiv.org) 公共 API 把研究建立在已有工作之上——零配置，无需搜索端点或密钥。动手前用 `arbor idea-check "<你的想法>"` 审查任意想法的新颖性，或让 Coordinator 自动为每个新分支把关。详见[文献检索与新颖性审查](#-文献检索与新颖性审查)。🔎
+- **2026-06-18** — Arbor 被美国知名科技媒体 [VentureBeat](https://venturebeat.com/) 报道：[《New AI optimization framework beats Claude Code and Codex by 2.5x on the same compute budget》](https://venturebeat.com/orchestration/new-ai-optimization-framework-beats-claude-code-and-codex-by-2-5x-on-the-same-compute-budget)。📰
+- **2026-06-12** — Arbor 原生 CLI 运行时与智能体技能套件（Codex / Claude Code）正式发布。🚀
+- **2026-06-11** — Arbor 论文在 [arXiv](https://arxiv.org/abs/2606.11926) 发布。🎉
 
 ## 💡 为什么选择 Arbor
 

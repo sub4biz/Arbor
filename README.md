@@ -3,13 +3,15 @@
 </p>
 
 
-# Toward Generalist Autonomous Research via Hypothesis-Tree Refinement
+<h1 align="center">🌳 Arbor</h1>
 
+<h3 align="center">The autonomous research agent that beats Claude Code and Codex by <b>2.5×</b> on the same compute budget</h3>
 
 <p align="center">
   <a href="https://arxiv.org/pdf/2606.11926"><img src="https://img.shields.io/badge/Paper-arXiv-B31B1B?style=for-the-badge&logo=arxiv&logoColor=white" alt="Paper"></a>
   <a href="https://github.com/RUC-NLPIR/Arbor"><img src="https://img.shields.io/badge/Code-GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub"></a>
   <a href="https://RUC-NLPIR.github.io/Arbor/"><img src="https://img.shields.io/badge/Project_Page-Live-0E9B9B?style=for-the-badge&logo=githubpages&logoColor=white" alt="Project Page"></a>
+  <a href="https://RUC-NLPIR.github.io/Arbor/demo.html"><img src="https://img.shields.io/badge/Live_Demo-Watch-FF5C8A?style=for-the-badge&logo=githubpages&logoColor=white" alt="Live Demo"></a>
   <a href="https://RUC-NLPIR.github.io/Arbor/docs/"><img src="https://img.shields.io/badge/Docs-Material-526CFE?style=for-the-badge&logo=materialformkdocs&logoColor=white" alt="Docs"></a>
   <a href="https://github.com/RUC-NLPIR/Arbor/discussions"><img src="https://img.shields.io/badge/Discussions-Join-5865F2?style=for-the-badge&logo=github&logoColor=white" alt="Discussions"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-D22128?style=for-the-badge&logo=apache&logoColor=white" alt="License: Apache 2.0"></a>
@@ -19,18 +21,29 @@
   <b>English</b> | <a href="README.zh-CN.md">简体中文</a>
 </p>
 
-**Arbor is an autonomous research agent that turns a long-horizon objective into a
-cumulative search.** Give it a benchmark and a goal; it proposes hypotheses, edits
-code, runs real experiments, learns from the results, and keeps the improvements that
-hold up on held-out data. Instead of one-shot attempts that forget what failed, Arbor
-grows a **hypothesis tree**: every idea becomes a branch — pruned if it fails,
-harvested if it works — and insights propagate back so later ideas start smarter.
+<p align="center">
+  <i>Give Arbor a benchmark and a goal. It proposes hypotheses, edits code, runs real
+  experiments, and keeps only the gains that survive held-out data — growing a
+  <b>hypothesis tree</b> instead of forgetting what failed.</i>
+</p>
 
-For more details, visit our [project page](https://RUC-NLPIR.github.io/Arbor/)
-and read the [paper](https://arxiv.org/pdf/2606.11926). For a more detailed usage manual,
-see our [documentation](https://RUC-NLPIR.github.io/Arbor/docs/). 🧭 You can also
-choose the [CLI or Skill version](#-cli-and-skill-versions) depending on your
-environment and workflow.
+> **▶️ Try it in 30 seconds — no API key, no config:**
+>
+> ```bash
+> pip install arbor-agent && arbor replay --demo   # watch the hypothesis tree grow live
+> ```
+>
+> Or **watch it right now in your browser** — nothing to install: **[▶️ Live Demo](https://RUC-NLPIR.github.io/Arbor/demo.html)**.
+
+### 🏆 One controller, six tasks — wins the held-out test on all of them
+
+| Task | Metric | Claude Code | Codex | **Arbor** |
+| --- | --- | :---: | :---: | :---: |
+| BrowseComp | acc ↑ | 53.33 | 50.00 | **67.67** |
+| Terminal-Bench 2.0 | pass ↑ | 71.70 | 73.59 | **77.36** |
+| Math-Reasoning Data | gap ↑ | 8.33 | 6.25 | **20.83** |
+
+Plus **86.36% Any-Medal on MLE-Bench Lite** (GPT-5.5). → [See all six tasks](#-results) · [project page](https://RUC-NLPIR.github.io/Arbor/) · [paper](https://arxiv.org/pdf/2606.11926) · [docs](https://RUC-NLPIR.github.io/Arbor/docs/)
 
 ## 🎬 Demo
 
@@ -39,10 +52,10 @@ https://github.com/user-attachments/assets/49c1a306-d2e9-49d6-9c83-65e38a62df30
 
 ## 📣 News
 
-- **2026-06** — **Built-in literature search & idea novelty checks.** Arbor can now ground its research in prior work via the public [alphaXiv](https://www.alphaxiv.org) API — zero config, no search endpoint or key. Novelty-check any idea before you build it with `arbor idea-check "<your idea>"`, or let the Coordinator vet every new branch automatically. See [Literature Search & Novelty Checks](#-literature-search--novelty-checks). 🔎
-- **2026-06** — Arbor was featured by [VentureBeat](https://venturebeat.com/), one of the leading tech media outlets in the US: ["New AI optimization framework beats Claude Code and Codex by 2.5x on the same compute budget"](https://venturebeat.com/orchestration/new-ai-optimization-framework-beats-claude-code-and-codex-by-2-5x-on-the-same-compute-budget). 📰
-- **2026-06** — Arbor's native CLI runtime and Agent Skill Suite (Codex / Claude Code) are released. 🚀
-- **2026-06** — The Arbor paper is released on [arXiv](https://arxiv.org/abs/2606.11926). 🎉
+- **2026-06-22** — **Built-in literature search & idea novelty checks.** Arbor can now ground its research in prior work via the public [alphaXiv](https://www.alphaxiv.org) API — zero config, no search endpoint or key. Novelty-check any idea before you build it with `arbor idea-check "<your idea>"`, or let the Coordinator vet every new branch automatically. See [Literature Search & Novelty Checks](#-literature-search--novelty-checks). 🔎
+- **2026-06-18** — Arbor was featured by [VentureBeat](https://venturebeat.com/), one of the leading tech media outlets in the US: ["New AI optimization framework beats Claude Code and Codex by 2.5x on the same compute budget"](https://venturebeat.com/orchestration/new-ai-optimization-framework-beats-claude-code-and-codex-by-2-5x-on-the-same-compute-budget). 📰
+- **2026-06-12** — Arbor's native CLI runtime and Agent Skill Suite (Codex / Claude Code) are released. 🚀
+- **2026-06-11** — The Arbor paper is released on [arXiv](https://arxiv.org/abs/2606.11926). 🎉
 
 ## 💡 Why Arbor
 
