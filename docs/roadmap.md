@@ -164,6 +164,52 @@ sources behind each idea) and a per-run cost breakdown.
 
 ---
 
+## Direction 4 — Adoption, DX & community
+
+The first three directions grow what Arbor *does*. This one lowers the barrier
+between a curious visitor and a first successful run, and makes the project's
+momentum visible. The goal is a shorter path to the "aha" moment, not more
+surface area.
+
+### 4.1 Live, zero-install demo
+
+`arbor replay --demo --html` already emits a self-contained, dependency-free page
+of a real run. Publish that page (e.g. on GitHub Pages alongside the docs) and
+link it from the top of the README, so a visitor can watch the hypothesis tree
+grow **without installing anything**. One recorded run, refreshed when the
+dashboard changes.
+
+### 4.2 Examples gallery
+
+Today `examples/algotune_knn` is the only end-to-end task a newcomer can run.
+Grow this into a small gallery so different audiences can self-identify, each
+with a copy-pasteable command and a short asciinema recording:
+
+- a Kaggle / MLE-style task (pairs with the `mle_kaggle` plugin),
+- a prompt / harness-engineering task, and
+- a small training / fine-tuning task.
+
+Keep the bar at "runs in minutes on a laptop or a free key", reusing the
+zero-config discipline of `algotune_knn`.
+
+### 4.3 Regular releases and a changelog
+
+Versions are already derived from `v*` tags via setuptools-scm, so the cost of a
+release is low. Cut a release on a predictable cadence with human-readable notes,
+and keep a `CHANGELOG.md` (or GitHub Releases as the source of truth) so the
+project's progress is legible from the outside.
+
+### 4.4 Public roadmap and issue board
+
+Surface this document as a public board (GitHub Projects) and tag tracked work
+with `good first issue` / `help wanted`. Several threads are already
+contribution-shaped — growing the [benchmark zoo](#21-benchmark-zoo-organized-by-domain-format-tooling-shipped-collection-growing)
+to 3–5 packs ([2.1](#21-benchmark-zoo-organized-by-domain-format-tooling-shipped-collection-growing))
+and adding domain plugins ([2.2](#22-plugin-gallery)) — so opening them up turns
+readers into contributors.
+
+---
+
 Have an idea or want to own one of these threads? Open a
 [discussion](https://github.com/RUC-NLPIR/Arbor/discussions) or see
 [Contributing](contributing.md).
