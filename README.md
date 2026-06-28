@@ -3,8 +3,9 @@
 </p>
 
 
-# Toward Generalist Autonomous Research via Hypothesis-Tree Refinement
+<h1 align="center">🌳 Arbor</h1>
 
+<h3 align="center">The autonomous research agent that beats Claude Code and Codex by <b>2.5×</b> on the same compute budget</h3>
 
 <p align="center">
   <a href="https://arxiv.org/pdf/2606.11926"><img src="https://img.shields.io/badge/Paper-arXiv-B31B1B?style=for-the-badge&logo=arxiv&logoColor=white" alt="Paper"></a>
@@ -19,18 +20,27 @@
   <b>English</b> | <a href="README.zh-CN.md">简体中文</a>
 </p>
 
-**Arbor is an autonomous research agent that turns a long-horizon objective into a
-cumulative search.** Give it a benchmark and a goal; it proposes hypotheses, edits
-code, runs real experiments, learns from the results, and keeps the improvements that
-hold up on held-out data. Instead of one-shot attempts that forget what failed, Arbor
-grows a **hypothesis tree**: every idea becomes a branch — pruned if it fails,
-harvested if it works — and insights propagate back so later ideas start smarter.
+<p align="center">
+  <i>Give Arbor a benchmark and a goal. It proposes hypotheses, edits code, runs real
+  experiments, and keeps only the gains that survive held-out data — growing a
+  <b>hypothesis tree</b> instead of forgetting what failed.</i>
+</p>
 
-For more details, visit our [project page](https://RUC-NLPIR.github.io/Arbor/)
-and read the [paper](https://arxiv.org/pdf/2606.11926). For a more detailed usage manual,
-see our [documentation](https://RUC-NLPIR.github.io/Arbor/docs/). 🧭 You can also
-choose the [CLI or Skill version](#-cli-and-skill-versions) depending on your
-environment and workflow.
+> **▶️ Try it in 30 seconds — no API key, no config:**
+>
+> ```bash
+> pip install arbor-agent && arbor replay --demo   # watch the hypothesis tree grow live
+> ```
+
+### 🏆 One controller, six tasks — wins the held-out test on all of them
+
+| Task | Metric | Claude Code | Codex | **Arbor** |
+| --- | --- | :---: | :---: | :---: |
+| BrowseComp | acc ↑ | 53.33 | 50.00 | **67.67** |
+| Terminal-Bench 2.0 | pass ↑ | 71.70 | 73.59 | **77.36** |
+| Math-Reasoning Data | gap ↑ | 8.33 | 6.25 | **20.83** |
+
+Plus **86.36% Any-Medal on MLE-Bench Lite** (GPT-5.5). → [See all six tasks](#-results) · [project page](https://RUC-NLPIR.github.io/Arbor/) · [paper](https://arxiv.org/pdf/2606.11926) · [docs](https://RUC-NLPIR.github.io/Arbor/docs/)
 
 ## 🎬 Demo
 

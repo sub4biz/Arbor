@@ -3,8 +3,9 @@
 </p>
 
 
-# 基于假设树的面向通用自主科研方法（Toward Generalist Autonomous Research via Hypothesis-Tree Refinement）
+<h1 align="center">🌳 Arbor</h1>
 
+<h3 align="center">在相同算力预算下，效果超越 Claude Code 与 Codex <b>2.5×</b> 的自主科研智能体</h3>
 
 <p align="center">
   <a href="https://arxiv.org/pdf/2606.11926"><img src="https://img.shields.io/badge/Paper-arXiv-B31B1B?style=for-the-badge&logo=arxiv&logoColor=white" alt="Paper"></a>
@@ -19,13 +20,26 @@
   <a href="README.md">English</a> | <b>简体中文</b>
 </p>
 
-**Arbor 是一个自主科研智能体，可以把长周期目标转化为持续累积的搜索过程。** 给它一个基准
-（benchmark）和一个目标，它会提出假设、修改代码、运行真实实验、从结果中学习，并保留那些在
-留出（held-out）数据上经得起验证的改进。不同于“一次性尝试、过后即弃”的做法，Arbor 会逐步生长出一棵
-**假设树**：每个想法都是一根分支，失败则剪枝，成功则保留；洞见会沿树反向传播，让后续想法
-从更可靠的起点出发。
+<p align="center">
+  <i>给 Arbor 一个基准和一个目标。它会提出假设、修改代码、运行真实实验，只保留经得起留出
+  数据验证的改进——生长出一棵<b>假设树</b>，而不是过后即弃、忘记失败的教训。</i>
+</p>
 
-更多详情，请访问我们的[项目主页](https://ruc-nlpir.github.io/Arbor/)并阅读[论文](https://arxiv.org/pdf/2606.11926)。如需详细的使用说明，请参阅[文档](https://ruc-nlpir.github.io/Arbor/docs/)。🧭 你也可以根据自己的环境和工作流选择使用 [CLI 版本或技能套件版本](https://claude.ai/chat/e7121091-ce2c-4970-a60f-16b54c453729#-cli-与技能套件版本)。
+> **▶️ 30 秒上手——无需 API key，无需配置：**
+>
+> ```bash
+> pip install arbor-agent && arbor replay --demo   # 实时观看假设树的生长过程
+> ```
+
+### 🏆 一个控制器，六项任务——全部赢下留出测试集
+
+| 任务 | 指标 | Claude Code | Codex | **Arbor** |
+| --- | --- | :---: | :---: | :---: |
+| BrowseComp | acc ↑ | 53.33 | 50.00 | **67.67** |
+| Terminal-Bench 2.0 | pass ↑ | 71.70 | 73.59 | **77.36** |
+| Math-Reasoning Data | gap ↑ | 8.33 | 6.25 | **20.83** |
+
+外加 **MLE-Bench Lite 上 86.36% Any-Medal**（GPT-5.5）。→ [查看全部六项任务](#-实验结果) · [项目主页](https://ruc-nlpir.github.io/Arbor/) · [论文](https://arxiv.org/pdf/2606.11926) · [文档](https://ruc-nlpir.github.io/Arbor/docs/)
 
 ## 📣 最新动态
 
