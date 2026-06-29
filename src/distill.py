@@ -70,7 +70,28 @@ def build_skills(session_dir: Path) -> list[tuple[str, str, str]]:
     return out
 
 
-def distill_to_session(session_dir: Path) -> Path | None:
+def _abstract(provider: Any, bullets: list[str]) -> list[str]:
+    """Lift task-specific bullets to transferable principles via the LLM.
+
+    Best-effort: any failure (no provider, async issues, bad output) returns the
+    bullets unchanged, so distillation always succeeds deterministically.
+    """
+    if not provider or not bullets:
+        return bullets
+    try:
+        import asyncio
+        prompt = ("Rewrite each lesson as ONE transferable principle: drop task-specific "
+                  "names/numbers, keep what generalizes. Same count, one per line, no preamble.\n\n"
+                  + "\n".join(f"- {b}" for b in bullets))
+        resp = asyncio.run(provider.create(system="You distill reusable research principles.",
+                                           messages=[{"role": "user", "content": prompt}], max_tokens=600))
+        out = [ln.lstrip("-* ").strip() for ln in resp.get_text().splitlines() if ln.strip()]
+        return out or bullets
+    except Exception:  # pylint: disable=broad-exception-caught
+        return bullets
+
+
+def distill_to_session(session_dir: Path, provider: Any = None) -> Path | None:
     """Write a consolidated EXPERIENCE.md inside the run's own session folder.
 
     Experience stays per-session (not a global skill library): future runs search
@@ -84,7 +105,7 @@ def distill_to_session(session_dir: Path) -> Path | None:
     lines: list[str] = []
     for level, _d, bullets in frags:
         lines.append(f"## {level}")
-        lines += [f"- {b}" for b in bullets]
+        lines += [f"- {b}" for b in _abstract(provider, bullets)]
     md = _frag(f"experience-{domain}", f"Experience from a {domain} run.",
                "reuse on a similar topic", f"Experience: {domain}", lines)
     out = session_dir / "EXPERIENCE.md"
