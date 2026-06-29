@@ -114,3 +114,34 @@ def write_trajectory(session_dir: Path) -> Path:
 def export_trajectory(session: str, cwd: Path | None = None) -> Path:
     """Resolve a session name/path and write its trajectory (CLI/offline use)."""
     return write_trajectory(resolve_session_dir(Path(session), cwd))
+
+
+def append_token_record(
+    path: str | Path,
+    *,
+    messages: list[dict[str, Any]],
+    response: Any,
+    turn: int,
+    model: str,
+) -> None:
+    """Append one token-level call record (Polar-style) to ``tokens.jsonl``.
+
+    Captures the request context and the model output for SFT. logprobs/token_ids
+    are filled only when the provider returns them (OpenAI); Anthropic gives
+    none, so we record null rather than fake it. Best-effort — never raise.
+    """
+    try:
+        u = getattr(response, "usage", None)
+        rec = {
+            "turn": turn,
+            "model": model,
+            "messages": messages,
+            "output": getattr(response, "raw_content", None),
+            "input_tokens": int(getattr(u, "input_tokens", 0) or 0),
+            "output_tokens": int(getattr(u, "output_tokens", 0) or 0),
+            "logprobs": getattr(response, "logprobs", None),  # None unless provider gives it
+        }
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    except Exception:  # pylint: disable=broad-exception-caught
+        pass

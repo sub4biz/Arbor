@@ -630,6 +630,11 @@ class CoordinatorOrchestrator:
             verbose=self.config.verbose,
             workspace_dir=self.config.workspace_dir,
             agent_label="coordinator",
+            token_trace_path=(
+                str(Path(self.config.workspace_dir) / "tokens.jsonl")
+                if getattr(self.config, "token_trace", False) and self.config.workspace_dir
+                else None
+            ),
             inter_turn_user_messages=_drain_dashboard_messages,
             checkpoint_hook=lambda msgs, turn: self._write_checkpoint(
                 reason="turn", messages=msgs
