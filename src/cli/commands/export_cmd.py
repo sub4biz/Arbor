@@ -24,7 +24,7 @@ def export_command(
         None,
         "--format",
         "-f",
-        help="Export format: html or jsonl. Inferred from output extension when omitted.",
+        help="Export format: html, jsonl, or trajectory. Inferred from output extension when omitted.",
     ),
 ) -> None:
     """Export a previous Arbor session for review or sharing."""
@@ -33,6 +33,11 @@ def export_command(
 
     try:
         session_dir = resolve_session_dir(session, cwd)
+        if (fmt or "").lower() == "trajectory":
+            from ...trajectory import write_trajectory
+            path = write_trajectory(session_dir)
+            typer.secho(f"Exported trajectory to: {path}", fg=typer.colors.GREEN)
+            return
         result = export_session(session_dir, output, fmt=fmt)
     except ExportError as exc:
         typer.secho(f"error: {exc}", fg=typer.colors.RED, err=True)

@@ -1139,6 +1139,16 @@ class CoordinatorOrchestrator:
         except OSError as e:
             _print_status(f"Warning: failed to write run_stats.json: {e}")
 
+        # Self-evolution line 1: dump a training-ready decision trace alongside the
+        # stats. Best-effort — never fail a finished run over an export. Off via
+        # `evolution.export_trajectory: false`.
+        if getattr(self.config, "export_trajectory", True):
+            try:
+                from ..trajectory import write_trajectory
+                _print_status(f"Wrote trajectory: {write_trajectory(self.config.workspace_dir)}")
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                _print_status(f"Warning: failed to write trajectory: {e}")
+
     # ------------------------------------------------------------------
     # Final report
     # ------------------------------------------------------------------
