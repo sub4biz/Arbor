@@ -45,6 +45,22 @@ def _cached_prompt_tokens(usage: Any) -> int:
     return int(cached or 0)
 
 
+def _extract_logprobs(choice: Any) -> list[dict[str, Any]] | None:
+    """Pull sampled-token logprobs from a chat choice, or None if absent.
+
+    Returns ``[{token, logprob}, ...]`` for token-faithful traces. Endpoints
+    that don't return logprobs (most non-OpenAI gateways) yield None.
+    """
+    lp = getattr(choice, "logprobs", None)
+    content = getattr(lp, "content", None) if lp is not None else None
+    if not content:
+        return None
+    out: list[dict[str, Any]] = []
+    for tok in content:
+        out.append({"token": getattr(tok, "token", None), "logprob": getattr(tok, "logprob", None)})
+    return out or None
+
+
 class OpenAICompatProvider(LLMProvider):
     """LLM provider for any OpenAI-compatible API.
 
@@ -107,6 +123,9 @@ class OpenAICompatProvider(LLMProvider):
             "model": self.model,
             "messages": oai_messages,
             "max_tokens": max_tokens,
+            # Token-faithful traces: ask for sampled-token logprobs. Endpoints that
+            # don't support it ignore these; we read back None and degrade cleanly.
+            "logprobs": True,
         }
         if oai_tools:
             params["tools"] = oai_tools
@@ -405,4 +424,5 @@ class OpenAICompatProvider(LLMProvider):
             usage=usage,
             model=raw.model or self.model,
             raw_content=raw_content,
+            logprobs=_extract_logprobs(choice),
         )

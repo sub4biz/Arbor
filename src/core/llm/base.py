@@ -83,6 +83,10 @@ class LLMResponse:
     # Populated by the provider so that appending to messages[] is lossless.
     raw_content: list[dict[str, Any]] = field(default_factory=list)
 
+    # Sampled-token logprobs when the provider returns them (OpenAI logprobs=true);
+    # None otherwise (e.g. Anthropic). For token-faithful SFT/RL traces.
+    logprobs: list[dict[str, Any]] | None = None
+
     def get_text(self) -> str:
         """Concatenate all text blocks."""
         return "\n".join(b.text for b in self.content if isinstance(b, TextBlock))
