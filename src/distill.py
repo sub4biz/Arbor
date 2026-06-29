@@ -53,49 +53,67 @@ def build_skills(session_dir: Path) -> list[tuple[str, str, str]]:
     root = tree.get("ROOT") or {}
     meta = root.get("meta", {}) if isinstance(root.get("meta"), dict) else {}
     domain = _domain(meta, session_dir)
-    run = session_dir.name
-    out: list[tuple[str, str, str]] = []
+    out: list[tuple[str, str, list[str]]] = []  # (level, domain, bullets)
 
     # domain layer — verified wins/losses, transferable within domain
     wins = [n for n in tree.values() if n.get("status") in ("merged", "done") and n.get("insight")]
-    if wins or root.get("insight"):
-        body = ([root["insight"].strip() + "\n"] if root.get("insight") else [])
-        body.append("## Idea classes that won / lost (held-out verified)")
-        for n in sorted(wins, key=lambda x: x.get("score") or 0, reverse=True):
-            body.append(f"- [{n.get('status')}, score={n.get('score')}] {n.get('insight','').strip()}")
-        out.append(("domain", domain, _frag(
-            f"learned-{domain}-{run}", f"Domain lessons from a {domain} run.",
-            f"IDEATE on a {domain}-like task — candidate priors, not rules.",
-            f"Learned: {domain}", body)))
+    dom_bul = []
+    if root.get("insight"):
+        dom_bul.append(root["insight"].strip().split("\n")[0][:200])
+    for n in sorted(wins, key=lambda x: x.get("score") or 0, reverse=True):
+        dom_bul.append(f"[{n.get('status')}, score={n.get('score')}] {n.get('insight','').strip()[:200]}")
+    if dom_bul:
+        out.append(("domain", domain, dom_bul))
 
     # meta layer — strategy from the tree's shape, transfers across domains
     pruned = [n for n in tree.values() if n.get("status") == "pruned"]
     merged = [n for n in tree.values() if n.get("status") == "merged"]
-    process = [f"- {len(merged)} merged, {len(pruned)} pruned of {max(0,len(tree)-1)} ideas — "
-               f"{'broad search paid off' if merged else 'most directions died; prune faster'}."]
-    process += [f"- dead-end: {n.get('insight','').strip()[:160]}" for n in pruned if n.get("insight")]
-    # fold in the live process trail (lessons logged mid-run, beyond the final tree)
+    process = [f"dead-end: {n.get('insight','').strip()[:160]}" for n in pruned if n.get("insight")]
     try:
         from .experience import load_experience
         trail = [e for e in load_experience(session_dir) if e.get("status") in ("pruned", "done")]
-        process += [f"- step {e['node_id']}: {e['insight'][:140]}" for e in trail if e.get("insight")]
+        process += [f"{e['node_id']}: {e['insight'][:140]}" for e in trail if e.get("insight")]
     except Exception:  # pylint: disable=broad-exception-caught
         pass
-    if pruned or merged:
-        out.append(("meta", "general", _frag(
-            f"strategy-{run}", "Cross-domain research strategy from a past run.",
-            "IDEATE on any task — search-strategy priors.", "Learned: strategy", process)))
+    if process:
+        out.append(("meta", "general", process))
     return out
 
 
+def _norm(b: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"\[.*?\]|score=\S+|\d+", "", b.lower())).strip()
+
+
 def distill_to_library(session_dir: Path, lib_root: Path | None = None) -> list[Path]:
-    """Write layered skills into <lib>/<level>/<domain>/; return paths written."""
+    """Merge layered bullets into one consolidated skill per (level, domain).
+
+    Recurring lessons reinforce (occurrence count = confidence) instead of piling
+    up one file per run. Deterministic dedup by normalized text. Returns paths.
+    """
     root = lib_root or Path.home() / ".arbor" / "skills"
     paths: list[Path] = []
-    for level, domain, md in build_skills(session_dir):
+    for level, domain, bullets in build_skills(session_dir):
         d = root / level / domain
         d.mkdir(parents=True, exist_ok=True)
-        out = d / f"learned-{Path(session_dir).name}.md"
-        out.write_text(md, encoding="utf-8")
+        out = d / "learned.md"
+        seen: dict[str, list[str]] = {}  # norm -> [count, text]
+        if out.exists():  # parse prior counts from "- [xN] text"
+            for ln in out.read_text(encoding="utf-8").splitlines():
+                m = re.match(r"- \[x(\d+)\] (.+)", ln)
+                if m:
+                    seen[_norm(m.group(2))] = [int(m.group(1)), m.group(2)]
+        for b in bullets:
+            k = _norm(b)
+            if k in seen:
+                seen[k][0] += 1
+            else:
+                seen[k] = [1, b]
+        ranked = sorted(seen.values(), key=lambda x: -x[0])
+        when = ("any task — search-strategy priors" if level == "meta"
+                else f"a {domain}-like task — candidate priors, not rules")
+        body = [f"- [x{c}] {t}" for c, t in ranked]
+        out.write_text(_frag(f"learned-{level}-{domain}", f"Consolidated {level} lessons.",
+                             f"IDEATE on {when}.", f"Learned: {level}/{domain}", body),
+                       encoding="utf-8")
         paths.append(out)
     return paths
