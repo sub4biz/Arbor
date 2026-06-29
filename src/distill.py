@@ -28,9 +28,15 @@ def _slug(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", (s or "general").lower()).strip("-") or "general"
 
 
-def _domain(tree_meta: dict[str, Any]) -> str:
-    d = tree_meta.get("domain") or tree_meta.get("benchmark") or tree_meta.get("cwd") or "general"
-    return _slug(Path(str(d)).name)
+def _domain(tree_meta: dict[str, Any], session_dir: Path) -> str:
+    d = tree_meta.get("domain") or tree_meta.get("benchmark") or tree_meta.get("cwd")
+    if not d:
+        # session lives at <project>/.arbor/sessions/<run>; recover the project name.
+        parts = session_dir.resolve().parts
+        d = parts[-4] if len(parts) >= 4 and parts[-3:-1] == ("sessions",) else ""
+        if not d and ".arbor" in parts:
+            d = parts[parts.index(".arbor") - 1]
+    return _slug(Path(str(d)).name) if d else "general"
 
 
 def _frag(name: str, desc: str, when: str, title: str, body: list[str]) -> str:
@@ -46,7 +52,7 @@ def build_skills(session_dir: Path) -> list[tuple[str, str, str]]:
         return []
     root = tree.get("ROOT") or {}
     meta = root.get("meta", {}) if isinstance(root.get("meta"), dict) else {}
-    domain = _domain(meta)
+    domain = _domain(meta, session_dir)
     run = session_dir.name
     out: list[tuple[str, str, str]] = []
 
