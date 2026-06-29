@@ -1,18 +1,9 @@
-"""Skill distillation (self-evolution line 2a).
+"""Experience distillation (self-evolution line 2).
 
-Turns a finished run into reusable skills in the cross-run library
-(~/.arbor/skills/), tagged by **altitude** so recall can reuse them safely:
-
-  * ``meta``   — research strategy from the tree shape/process (pruned dead-ends,
-                 merge timing). Transfers across domains.
-  * ``domain`` — what classes of idea won/lost (from verified node insights).
-                 Transfers within a domain.
-  * task-specific findings stay in the run's REPORT/trajectory, not the library —
-    they don't transfer and would only pollute recall.
-
-Deterministic v1: lifts what the tree already abstracted. An LLM "raise the
-abstraction level" pass and dedup/confidence are later refinements. Best-effort:
-never fail a finished run.
+Turns a finished run into a consolidated EXPERIENCE.md in its own session folder,
+layered by altitude (meta = cross-domain strategy; domain = idea-class wins/losses).
+Task-specific findings stay in REPORT/trajectory. Experience is recalled per-session
+by recall.find_similar, not registered as global skills. Best-effort: never fail a run.
 """
 
 from __future__ import annotations
@@ -67,7 +58,6 @@ def build_skills(session_dir: Path) -> list[tuple[str, str, str]]:
 
     # meta layer — strategy from the tree's shape, transfers across domains
     pruned = [n for n in tree.values() if n.get("status") == "pruned"]
-    merged = [n for n in tree.values() if n.get("status") == "merged"]
     process = [f"dead-end: {n.get('insight','').strip()[:160]}" for n in pruned if n.get("insight")]
     try:
         from .experience import load_experience
@@ -80,40 +70,23 @@ def build_skills(session_dir: Path) -> list[tuple[str, str, str]]:
     return out
 
 
-def _norm(b: str) -> str:
-    return re.sub(r"\s+", " ", re.sub(r"\[.*?\]|score=\S+|\d+", "", b.lower())).strip()
+def distill_to_session(session_dir: Path) -> Path | None:
+    """Write a consolidated EXPERIENCE.md inside the run's own session folder.
 
-
-def distill_to_library(session_dir: Path, lib_root: Path | None = None) -> list[Path]:
-    """Merge layered bullets into one consolidated skill per (level, domain).
-
-    Recurring lessons reinforce (occurrence count = confidence) instead of piling
-    up one file per run. Deterministic dedup by normalized text. Returns paths.
+    Experience stays per-session (not a global skill library): future runs search
+    sessions, ask the user, and compose a tailored block. Returns the path or None.
     """
-    root = lib_root or Path.home() / ".arbor" / "skills"
-    paths: list[Path] = []
-    for level, domain, bullets in build_skills(session_dir):
-        d = root / level / domain
-        d.mkdir(parents=True, exist_ok=True)
-        out = d / "learned.md"
-        seen: dict[str, list[str]] = {}  # norm -> [count, text]
-        if out.exists():  # parse prior counts from "- [xN] text"
-            for ln in out.read_text(encoding="utf-8").splitlines():
-                m = re.match(r"- \[x(\d+)\] (.+)", ln)
-                if m:
-                    seen[_norm(m.group(2))] = [int(m.group(1)), m.group(2)]
-        for b in bullets:
-            k = _norm(b)
-            if k in seen:
-                seen[k][0] += 1
-            else:
-                seen[k] = [1, b]
-        ranked = sorted(seen.values(), key=lambda x: -x[0])
-        when = ("any task — search-strategy priors" if level == "meta"
-                else f"a {domain}-like task — candidate priors, not rules")
-        body = [f"- [x{c}] {t}" for c, t in ranked]
-        out.write_text(_frag(f"learned-{level}-{domain}", f"Consolidated {level} lessons.",
-                             f"IDEATE on {when}.", f"Learned: {level}/{domain}", body),
-                       encoding="utf-8")
-        paths.append(out)
-    return paths
+    session_dir = Path(session_dir)
+    frags = build_skills(session_dir)
+    if not frags:
+        return None
+    domain = next((d for lvl, d, _ in frags if lvl == "domain"), "general")
+    lines: list[str] = []
+    for level, _d, bullets in frags:
+        lines.append(f"## {level}")
+        lines += [f"- {b}" for b in bullets]
+    md = _frag(f"experience-{domain}", f"Experience from a {domain} run.",
+               "reuse on a similar topic", f"Experience: {domain}", lines)
+    out = session_dir / "EXPERIENCE.md"
+    out.write_text(md, encoding="utf-8")
+    return out
