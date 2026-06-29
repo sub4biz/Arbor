@@ -74,6 +74,13 @@ def build_skills(session_dir: Path) -> list[tuple[str, str, str]]:
     process = [f"- {len(merged)} merged, {len(pruned)} pruned of {max(0,len(tree)-1)} ideas — "
                f"{'broad search paid off' if merged else 'most directions died; prune faster'}."]
     process += [f"- dead-end: {n.get('insight','').strip()[:160]}" for n in pruned if n.get("insight")]
+    # fold in the live process trail (lessons logged mid-run, beyond the final tree)
+    try:
+        from .experience import load_experience
+        trail = [e for e in load_experience(session_dir) if e.get("status") in ("pruned", "done")]
+        process += [f"- step {e['node_id']}: {e['insight'][:140]}" for e in trail if e.get("insight")]
+    except Exception:  # pylint: disable=broad-exception-caught
+        pass
     if pruned or merged:
         out.append(("meta", "general", _frag(
             f"strategy-{run}", "Cross-domain research strategy from a past run.",
