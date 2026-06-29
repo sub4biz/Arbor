@@ -86,32 +86,6 @@ def _run_coro(coro: Any) -> Any:
         return ex.submit(lambda: asyncio.run(coro)).result()
 
 
-_DISTILL_SYS = (
-    "You distill REUSABLE research experience from one optimization run, for a future "
-    "agent attacking a SIMILAR task. Drop task-specific names/numbers; keep what transfers. "
-    "Return markdown with exactly these sections, terse bullets, omit a section if empty:\n"
-    "## Try first  (promising directions + why)\n"
-    "## Avoid  (dead-ends that failed + why)\n"
-    "## Key lever  (the dominant factor that decided performance)\n"
-    "## Pitfalls  (looked good but failed on held-out / overfit traps)\n"
-    "## How to approach  (search method that worked for this class of problem)"
-)
-
-
-def _llm_experience(provider: Any, raw: list[str]) -> str | None:
-    """Ask the LLM to turn raw lessons into structured, transferable experience."""
-    if not provider or not raw:
-        return None
-    try:
-        msg = "Raw lessons from the run:\n" + "\n".join(f"- {b}" for b in raw)
-        resp = _run_coro(provider.create(system=_DISTILL_SYS,
-                                         messages=[{"role": "user", "content": msg}], max_tokens=800))
-        text = resp.get_text().strip()
-        return text if "##" in text else None
-    except Exception:  # pylint: disable=broad-exception-caught
-        return None
-
-
 def _raw_lessons(frags: list[tuple[str, str, list[str]]]) -> list[str]:
     """Flatten layered bullets into raw lessons, dropping markdown-heading noise."""
     raw: list[str] = []
@@ -123,33 +97,72 @@ def _raw_lessons(frags: list[tuple[str, str, list[str]]]) -> list[str]:
     return raw
 
 
-def distill_to_session(session_dir: Path, provider: Any = None) -> Path | None:
-    """Write a consolidated EXPERIENCE.md inside the run's own session folder.
+_MINE_SYS = (
+    "You review one optimization run and surface CONCRETE, situational findings worth "
+    "remembering for the next run on this same dataset / task / harness. Keep them "
+    "SPECIFIC — a dataset quirk that helped the metric, a trap an executor or the harness "
+    "fell into. NOT generic advice or principles. One finding per line, format:\n"
+    "[leverage|pitfall] about: the concrete finding\n"
+    "Return only such lines, or nothing if there are no concrete findings."
+)
 
-    Prefers an LLM pass that structures lessons into transferable, decision-ready
-    sections (Try first / Avoid / Key lever / Pitfalls / How to approach); falls
-    back to clean deterministic bullets when no provider or the call fails.
+
+def _mine_findings(provider: Any, raw: list[str]) -> list[dict[str, str]]:
+    """B: mine the run's lessons for concrete findings not explicitly logged."""
+    if not provider or not raw:
+        return []
+    try:
+        msg = "Run material:\n" + "\n".join(f"- {b}" for b in raw)
+        resp = _run_coro(provider.create(system=_MINE_SYS,
+                                         messages=[{"role": "user", "content": msg}], max_tokens=700))
+        found = []
+        for ln in resp.get_text().splitlines():
+            m = re.match(r"\s*\[?(leverage|pitfall)\]?\s*([^:]*):\s*(.+)", ln, re.I)
+            if m:
+                found.append({"kind": m.group(1).lower(), "about": m.group(2).strip(), "note": m.group(3).strip()})
+        return found
+    except Exception:  # pylint: disable=broad-exception-caught
+        return []
+
+
+def distill_to_session(session_dir: Path, provider: Any = None) -> Path | None:
+    """Write EXPERIENCE.md: the run's concrete findings (logged live + mined).
+
+    Experience here is specific and situational by design — dataset quirks that
+    help, traps to avoid — for the next run on the same/similar target. Combines
+    findings the agent logged via RecordFinding (A) with an LLM mining pass (B).
     """
     session_dir = Path(session_dir)
-    frags = build_skills(session_dir)
-    if not frags:
+    domain = _domain({}, session_dir)
+
+    findings: list[dict[str, str]] = []
+    seen: set[str] = set()
+
+    def _add(f: dict[str, str]) -> None:
+        note = (f.get("note") or "").strip()
+        key = re.sub(r"\W+", "", note.lower())[:60]
+        if note and key not in seen:
+            seen.add(key)
+            findings.append({"kind": f.get("kind", ""), "about": f.get("about", ""), "note": note})
+
+    try:  # A: explicitly logged findings
+        from .experience import load_findings
+        for f in load_findings(session_dir):
+            _add(f)
+    except Exception:  # pylint: disable=broad-exception-caught
+        pass
+
+    raw = _raw_lessons(build_skills(session_dir))  # B: mine the rest from the run
+    for f in _mine_findings(provider, raw):
+        _add(f)
+
+    if not findings:
         return None
-    domain = next((d for lvl, d, _ in frags if lvl == "domain"), "general")
-    raw = _raw_lessons(frags)
-
-    body = _llm_experience(provider, raw)
-    if body is None:  # deterministic fallback: clean sections, no heading noise
-        wins = [b for b in raw if b.startswith("[merged") or b.startswith("[done")]
-        avoid = [b for b in raw if b.startswith("dead-end")]
-        lines = []
-        if wins:
-            lines += ["## Try first"] + [f"- {b}" for b in wins]
-        if avoid:
-            lines += ["## Avoid"] + [f"- {b}" for b in avoid]
-        body = "\n".join(lines) or "_(no transferable lessons)_"
-
-    md = _frag(f"experience-{domain}", f"Experience from a {domain} run.",
-               "reuse on a similar topic", f"Experience: {domain}", [body])
+    lines = [f"- **[{(f['kind'] or 'finding')}] {f['about']}** — {f['note']}" if f["about"]
+             else f"- **[{f['kind'] or 'finding'}]** {f['note']}" for f in findings]
+    md = _frag(f"experience-{domain}", f"Concrete findings from a {domain} run.",
+               "reuse when working on this dataset / task / harness again",
+               f"Findings: {domain}", lines)
     out = session_dir / "EXPERIENCE.md"
     out.write_text(md, encoding="utf-8")
     return out

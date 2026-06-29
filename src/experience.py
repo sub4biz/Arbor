@@ -54,3 +54,36 @@ def load_experience(session_dir: Path) -> list[dict[str, Any]]:
             except json.JSONDecodeError:
                 continue
     return out
+
+
+FINDINGS_FILENAME = "findings.jsonl"
+
+
+def record_finding(session_dir: str | Path | None, *, kind: str, about: str, note: str,
+                   source: str = "agent") -> None:
+    """Append one concrete, situational finding (a discovery or a pitfall).
+
+    These are kept specific on purpose — a dataset quirk you can exploit, a trap an
+    executor fell into — because their value is the specificity, for the next run on
+    the same/similar target. ``kind`` is free-form ('leverage' | 'pitfall' | ...).
+    """
+    if not session_dir or not (note or "").strip():
+        return
+    rec = {"kind": (kind or "").strip(), "about": (about or "").strip(),
+           "note": note.strip(), "source": source}
+    with open(Path(session_dir) / FINDINGS_FILENAME, "a", encoding="utf-8") as f:
+        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+
+def load_findings(session_dir: Path) -> list[dict[str, Any]]:
+    p = Path(session_dir) / FINDINGS_FILENAME
+    if not p.exists():
+        return []
+    out = []
+    for line in p.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            try:
+                out.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    return out
