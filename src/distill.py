@@ -102,8 +102,9 @@ _MINE_SYS = (
     "remembering for the next run on this same dataset / task / harness. Keep them "
     "SPECIFIC — a dataset quirk that helped the metric, a trap an executor or the harness "
     "fell into. NOT generic advice or principles. One finding per line, format:\n"
-    "[leverage|pitfall] about: the concrete finding\n"
-    "Return only such lines, or nothing if there are no concrete findings."
+    "[leverage|pitfall] SUBJECT: the concrete finding\n"
+    "where SUBJECT is the specific thing it concerns (the dataset, an executor, the "
+    "harness, a numpy call...). Return only such lines, or nothing if none."
 )
 
 
@@ -119,7 +120,10 @@ def _mine_findings(provider: Any, raw: list[str]) -> list[dict[str, str]]:
         for ln in resp.get_text().splitlines():
             m = re.match(r"\s*\[?(leverage|pitfall)\]?\s*([^:]*):\s*(.+)", ln, re.I)
             if m:
-                found.append({"kind": m.group(1).lower(), "about": m.group(2).strip(), "note": m.group(3).strip()})
+                about = m.group(2).strip()
+                if about.lower() in ("about", "subject"):  # guard leaked placeholder
+                    about = ""
+                found.append({"kind": m.group(1).lower(), "about": about, "note": m.group(3).strip()})
         return found
     except Exception:  # pylint: disable=broad-exception-caught
         return []
