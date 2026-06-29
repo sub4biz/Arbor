@@ -336,8 +336,14 @@ class TreeUpdateNodeTool(Tool):
         if updates.get("insight") or updates.get("status"):
             try:
                 from ...experience import append_experience
+                # Use the node's current insight (it may have been set by a prior
+                # update), not just this call's fields, so notes aren't empty.
+                node = self._tree.get_node(node_id)
+                enriched = dict(updates)
+                if not enriched.get("insight") and node is not None and getattr(node, "insight", ""):
+                    enriched["insight"] = node.insight
                 append_experience(getattr(self._tree, "json_path", None),
-                                   node_id=node_id, updates=updates)
+                                   node_id=node_id, updates=enriched)
             except Exception:  # pylint: disable=broad-exception-caught
                 pass
 

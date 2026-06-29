@@ -70,44 +70,86 @@ def build_skills(session_dir: Path) -> list[tuple[str, str, str]]:
     return out
 
 
-def _abstract(provider: Any, bullets: list[str]) -> list[str]:
-    """Lift task-specific bullets to transferable principles via the LLM.
+def _run_coro(coro: Any) -> Any:
+    """Run an async provider call from sync finalize, even inside a live loop.
 
-    Best-effort: any failure (no provider, async issues, bad output) returns the
-    bullets unchanged, so distillation always succeeds deterministically.
+    ``asyncio.run`` raises if a loop is already running (which is why the earlier
+    abstraction pass silently fell back). Run it in a dedicated thread instead.
     """
-    if not provider or not bullets:
-        return bullets
+    import asyncio
+    import concurrent.futures
     try:
-        import asyncio
-        prompt = ("Rewrite each lesson as ONE transferable principle: drop task-specific "
-                  "names/numbers, keep what generalizes. Same count, one per line, no preamble.\n\n"
-                  + "\n".join(f"- {b}" for b in bullets))
-        resp = asyncio.run(provider.create(system="You distill reusable research principles.",
-                                           messages=[{"role": "user", "content": prompt}], max_tokens=600))
-        out = [ln.lstrip("-* ").strip() for ln in resp.get_text().splitlines() if ln.strip()]
-        return out or bullets
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+        return ex.submit(lambda: asyncio.run(coro)).result()
+
+
+_DISTILL_SYS = (
+    "You distill REUSABLE research experience from one optimization run, for a future "
+    "agent attacking a SIMILAR task. Drop task-specific names/numbers; keep what transfers. "
+    "Return markdown with exactly these sections, terse bullets, omit a section if empty:\n"
+    "## Try first  (promising directions + why)\n"
+    "## Avoid  (dead-ends that failed + why)\n"
+    "## Key lever  (the dominant factor that decided performance)\n"
+    "## Pitfalls  (looked good but failed on held-out / overfit traps)\n"
+    "## How to approach  (search method that worked for this class of problem)"
+)
+
+
+def _llm_experience(provider: Any, raw: list[str]) -> str | None:
+    """Ask the LLM to turn raw lessons into structured, transferable experience."""
+    if not provider or not raw:
+        return None
+    try:
+        msg = "Raw lessons from the run:\n" + "\n".join(f"- {b}" for b in raw)
+        resp = _run_coro(provider.create(system=_DISTILL_SYS,
+                                         messages=[{"role": "user", "content": msg}], max_tokens=800))
+        text = resp.get_text().strip()
+        return text if "##" in text else None
     except Exception:  # pylint: disable=broad-exception-caught
-        return bullets
+        return None
+
+
+def _raw_lessons(frags: list[tuple[str, str, list[str]]]) -> list[str]:
+    """Flatten layered bullets into raw lessons, dropping markdown-heading noise."""
+    raw: list[str] = []
+    for _level, _d, bullets in frags:
+        for b in bullets:
+            b = b.strip()
+            if b and not b.lstrip("[").startswith("#") and "##" not in b:
+                raw.append(b)
+    return raw
 
 
 def distill_to_session(session_dir: Path, provider: Any = None) -> Path | None:
     """Write a consolidated EXPERIENCE.md inside the run's own session folder.
 
-    Experience stays per-session (not a global skill library): future runs search
-    sessions, ask the user, and compose a tailored block. Returns the path or None.
+    Prefers an LLM pass that structures lessons into transferable, decision-ready
+    sections (Try first / Avoid / Key lever / Pitfalls / How to approach); falls
+    back to clean deterministic bullets when no provider or the call fails.
     """
     session_dir = Path(session_dir)
     frags = build_skills(session_dir)
     if not frags:
         return None
     domain = next((d for lvl, d, _ in frags if lvl == "domain"), "general")
-    lines: list[str] = []
-    for level, _d, bullets in frags:
-        lines.append(f"## {level}")
-        lines += [f"- {b}" for b in _abstract(provider, bullets)]
+    raw = _raw_lessons(frags)
+
+    body = _llm_experience(provider, raw)
+    if body is None:  # deterministic fallback: clean sections, no heading noise
+        wins = [b for b in raw if b.startswith("[merged") or b.startswith("[done")]
+        avoid = [b for b in raw if b.startswith("dead-end")]
+        lines = []
+        if wins:
+            lines += ["## Try first"] + [f"- {b}" for b in wins]
+        if avoid:
+            lines += ["## Avoid"] + [f"- {b}" for b in avoid]
+        body = "\n".join(lines) or "_(no transferable lessons)_"
+
     md = _frag(f"experience-{domain}", f"Experience from a {domain} run.",
-               "reuse on a similar topic", f"Experience: {domain}", lines)
+               "reuse on a similar topic", f"Experience: {domain}", [body])
     out = session_dir / "EXPERIENCE.md"
     out.write_text(md, encoding="utf-8")
     return out

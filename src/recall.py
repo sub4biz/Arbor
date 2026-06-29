@@ -64,6 +64,26 @@ def list_experiences(cwd: str, limit: int = 8) -> list[tuple[str, str]]:
 def compose_for_topic(cwd: str, topic: str) -> str:
     """Compose one tailored experience block from sessions matching the topic."""
     hits = find_similar(cwd, topic)
+    return _compose(hits)
+
+
+def compose_from_sessions(cwd: str, names: list[str]) -> str:
+    """Compose from sessions the intake agent (an LLM) judged relevant.
+
+    LLM selection beats keyword matching: the intake agent reads the goal and the
+    project, so it picks which prior runs actually transfer. Falls back to nothing
+    if the named sessions lack experience.
+    """
+    sessions = Path(cwd) / ".arbor" / "sessions"
+    hits = []
+    for name in names or []:
+        exp = sessions / name / "EXPERIENCE.md"
+        if exp.exists():
+            hits.append({"name": name, "score": "selected", "text": exp.read_text(encoding="utf-8")})
+    return _compose(hits)
+
+
+def _compose(hits: list[dict[str, Any]]) -> str:
     if not hits:
         return ""
     parts = ["# Prior experience (candidate priors — verify, don't blindly apply)"]

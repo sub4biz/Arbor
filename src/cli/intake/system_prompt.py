@@ -19,6 +19,8 @@ def _prior_experience_block(starting_cwd: str) -> str:
         + "\n".join(lines) + "\n"
         "If the user's goal is similar, briefly offer to reuse the relevant one "
         "and ask whether to apply it (default yes). Don't push it if unrelated.\n"
+        "When launching with the user's agreement, set apply_experience=true and "
+        "list the relevant session names in experience_sessions (you judge relevance).\n"
         "\n"
     )
 
