@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -132,10 +133,16 @@ def build_default_registry(cwd: str, *, disabled: list[str] | set[str] | tuple[s
     n_builtin = registry.load_dir(pkg_skills, source="built-in")
     # Cross-run library: skills distilled from past runs (self-evolution). Loaded
     # from ~/.arbor/skills/**; lower priority than project, higher than built-in.
+    # Recall is domain-scoped to avoid negative transfer: meta/ (cross-domain)
+    # always loads; domain/<d>/ loads only when <d> matches this project.
     n_lib = 0
     home_lib = os.path.join(os.path.expanduser("~"), ".arbor", "skills")
+    here = re.sub(r"[^a-z0-9]+", "-", os.path.basename(os.path.abspath(cwd)).lower()).strip("-")
     if os.path.isdir(home_lib):
         for root, _dirs, _files in os.walk(home_lib):
+            rel = os.path.relpath(root, home_lib)
+            if rel.startswith("domain") and here and here not in rel.split(os.sep):
+                continue  # skip other domains' skills
             n_lib += registry.load_dir(root, source="library")
     # Project override
     project_skills = os.path.join(cwd, ".arbor", "skills")
