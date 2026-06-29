@@ -352,6 +352,15 @@ class Agent:
                 agent_cwd=self.config.cwd,
                 track_stats=self.config.track_stats,
             )
+            if self.config.token_trace_path:
+                from ..trajectory import append_token_record
+                append_token_record(
+                    self.config.token_trace_path,
+                    messages=self.messages,
+                    response=response,
+                    turn=turn,
+                    model=self.provider.model,
+                )
 
             # 3. Append assistant message
             self.messages.append({"role": "assistant", "content": response.raw_content})

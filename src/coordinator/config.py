@@ -471,6 +471,12 @@ class CoordinatorConfig(ProxyModel):
     skills_enabled: bool = True
     disabled_skills: list[str] = PydField(default_factory=list)
 
+    # ── Self-evolution ───────────────────────────────────────────────
+    # Write a training-ready decision trace (trajectory.jsonl) at finalize.
+    export_trajectory: bool = True
+    # Capture per-call token-level traces (tokens.jsonl) for SFT/RL. Heavy; off.
+    token_trace: bool = False
+
     # ── Plugin (runtime object; not serialized) ──────────────────────
     plugin: Any = PydField(default=None, exclude=True, repr=False)
 

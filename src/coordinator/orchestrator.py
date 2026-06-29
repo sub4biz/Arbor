@@ -630,6 +630,11 @@ class CoordinatorOrchestrator:
             verbose=self.config.verbose,
             workspace_dir=self.config.workspace_dir,
             agent_label="coordinator",
+            token_trace_path=(
+                str(Path(self.config.workspace_dir) / "tokens.jsonl")
+                if getattr(self.config, "token_trace", False) and self.config.workspace_dir
+                else None
+            ),
             inter_turn_user_messages=_drain_dashboard_messages,
             checkpoint_hook=lambda msgs, turn: self._write_checkpoint(
                 reason="turn", messages=msgs
@@ -1138,6 +1143,16 @@ class CoordinatorOrchestrator:
             _print_status(f"Wrote run stats: {out}")
         except OSError as e:
             _print_status(f"Warning: failed to write run_stats.json: {e}")
+
+        # Self-evolution line 1: dump a training-ready decision trace alongside the
+        # stats. Best-effort — never fail a finished run over an export. Off via
+        # `evolution.export_trajectory: false`.
+        if getattr(self.config, "export_trajectory", True):
+            try:
+                from ..trajectory import write_trajectory
+                _print_status(f"Wrote trajectory: {write_trajectory(self.config.workspace_dir)}")
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                _print_status(f"Warning: failed to write trajectory: {e}")
 
     # ------------------------------------------------------------------
     # Final report

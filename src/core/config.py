@@ -79,6 +79,10 @@ class AgentConfig(ProxyModel):
     # run's stats (#13 cache_hit_rate, the dashboard token counter, run_stats).
     track_stats: bool = Field(default=True, exclude=True, repr=False)
 
+    # Token-level trace sink (self-evolution line 1). When set, each LLM call's
+    # messages + output are appended to this jsonl for SFT/RL. None = off.
+    token_trace_path: str | None = Field(default=None, exclude=True, repr=False)
+
     # ── Derived paths ────────────────────────────────────────────────
 
     @property
