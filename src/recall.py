@@ -43,3 +43,30 @@ def find_similar(cwd: str, topic: str, *, limit: int = 3, threshold: float = 0.2
             hits.append({"name": exp.parent.name, "path": str(exp), "score": round(s, 3), "text": text})
     hits.sort(key=lambda h: -h["score"])
     return hits[:limit]
+
+
+def list_experiences(cwd: str, limit: int = 8) -> list[tuple[str, str]]:
+    """[(session_name, first-line summary)] of prior runs that left experience."""
+    sessions = Path(cwd) / ".arbor" / "sessions"
+    out: list[tuple[str, str]] = []
+    if not sessions.is_dir():
+        return out
+    for exp in sorted(sessions.glob("*/EXPERIENCE.md"), reverse=True)[:limit]:
+        desc = ""
+        for ln in exp.read_text(encoding="utf-8").splitlines():
+            if ln.startswith("description:"):
+                desc = ln.split(":", 1)[1].strip()
+                break
+        out.append((exp.parent.name, desc))
+    return out
+
+
+def compose_for_topic(cwd: str, topic: str) -> str:
+    """Compose one tailored experience block from sessions matching the topic."""
+    hits = find_similar(cwd, topic)
+    if not hits:
+        return ""
+    parts = ["# Prior experience (candidate priors — verify, don't blindly apply)"]
+    for h in hits:
+        parts.append(f"\n## from {h['name']} (match {h['score']})\n{h['text']}")
+    return "\n".join(parts)
