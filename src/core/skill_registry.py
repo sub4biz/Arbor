@@ -130,14 +130,25 @@ def build_default_registry(cwd: str, *, disabled: list[str] | set[str] | tuple[s
     # Built-in: <package_root>/skills/
     pkg_skills = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "skills")
     n_builtin = registry.load_dir(pkg_skills, source="built-in")
+    # Cross-run library: skills distilled from past runs (self-evolution). Loaded
+    # from ~/.arbor/skills/**; lower priority than project, higher than built-in.
+    n_lib = 0
+    home_lib = os.path.join(os.path.expanduser("~"), ".arbor", "skills")
+    n_lib += registry.load_dir(home_lib, source="library")
+    if os.path.isdir(home_lib):
+        for sub in sorted(os.listdir(home_lib)):
+            d = os.path.join(home_lib, sub)
+            if os.path.isdir(d):
+                n_lib += registry.load_dir(d, source="library")
     # Project override
     project_skills = os.path.join(cwd, ".arbor", "skills")
     n_project = registry.load_dir(project_skills, source="project")
     for name in disabled:
         registry._skills.pop(str(name), None)
     log.info(
-        "skill_registry: loaded %d built-in + %d project skills (total %d)",
+        "skill_registry: loaded %d built-in + %d library + %d project skills (total %d)",
         n_builtin,
+        n_lib,
         n_project,
         len(registry),
     )
