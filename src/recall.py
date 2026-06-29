@@ -84,9 +84,32 @@ def compose_from_sessions(cwd: str, names: list[str]) -> str:
 
 
 def _compose(hits: list[dict[str, Any]]) -> str:
+    """Merge findings across the matched sessions, deduped with a recurrence count.
+
+    A finding seen in several past runs is more trustworthy, so it's tagged [xN]
+    and ranked first — cross-session confidence without a global library.
+    """
     if not hits:
         return ""
-    parts = ["# Prior experience (candidate priors — verify, don't blindly apply)"]
+    merged: dict[str, list[Any]] = {}  # norm -> [count, bullet, first-session]
     for h in hits:
-        parts.append(f"\n## from {h['name']} (match {h['score']})\n{h['text']}")
-    return "\n".join(parts)
+        for ln in h["text"].splitlines():
+            ln = ln.strip()
+            if not ln.startswith("- "):
+                continue
+            note = re.sub(r"\*\*\[.*?\]\s*[^—]*\*\*\s*—?\s*", "", ln[2:]).strip()
+            key = re.sub(r"\W+", "", note.lower())[:80]
+            if not key:
+                continue
+            if key in merged:
+                merged[key][0] += 1
+            else:
+                merged[key] = [1, ln[2:].strip(), h["name"]]
+    if not merged:  # nothing parseable — fall back to raw concatenation
+        return "\n".join(["# Prior experience (candidate priors — verify, don't blindly apply)"]
+                         + [f"\n## from {h['name']}\n{h['text']}" for h in hits])
+    ranked = sorted(merged.values(), key=lambda x: -x[0])
+    lines = ["# Prior experience (candidate priors — verify, don't blindly apply)",
+             f"_merged from {len(hits)} past run(s); [xN] = seen in N runs_\n"]
+    lines += [f"- [x{c}] {bullet}" for c, bullet, _src in ranked]
+    return "\n".join(lines)
