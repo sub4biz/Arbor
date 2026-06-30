@@ -476,9 +476,11 @@ class CoordinatorConfig(ProxyModel):
     export_trajectory: bool = True
     # Capture per-call token-level traces (tokens.jsonl) for SFT/RL. Heavy; off.
     token_trace: bool = False
-    # Distill run insights into a reusable skill in ~/.arbor/skills (line 2). Off.
-    distill_skills: bool = False
-    # Use the LLM to abstract distilled lessons into transferable principles. Off.
+    # Save the run's concrete findings to EXPERIENCE.md at finalize (self-evolution).
+    # On by default — it only writes a notes file in the session; reuse is opt-in and
+    # decided by the user in the intake conversation.
+    distill_skills: bool = True
+    # Also LLM-mine the run for findings the agent didn't log (extra calls). Opt-in.
     distill_abstract: bool = False
 
     # ── Plugin (runtime object; not serialized) ──────────────────────

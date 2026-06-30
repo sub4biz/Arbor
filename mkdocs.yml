@@ -62,6 +62,7 @@ nav:
           - Overview: zoo-overview.md
           - Format & verifier: zoo.md
       - Skills: skills.md
+      - Self-Evolution: self-evolution.md
       - Outputs & Resume: outputs-and-resume.md
   - Reference:
       - CLI: cli.md
@@ -125,6 +126,7 @@ plugins:
             Overview: 概览
             Format & verifier: 格式与校验器
             Skills: 技能
+            Self-Evolution: 自我进化
             Outputs & Resume: 输出与续跑
             Reference: 参考
             Contributing: 贡献
