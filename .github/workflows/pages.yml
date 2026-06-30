@@ -35,6 +35,14 @@ jobs:
           pip install "mkdocs-material>=9.5" "mkdocs-static-i18n>=1.2"
           mkdocs build --strict -d _site/docs
 
+      # ── Live demo: arbor replay --demo --html -> _site/demo.html ─────
+      # Regenerated from source on every deploy so the hosted, zero-install
+      # demo always matches the shipped code (no committed artifact to go stale).
+      - name: Build live demo page
+        run: |
+          pip install .
+          arbor replay --demo --html --no-open --out _site/demo.html
+
       # ── Project page: Vite/React -> _site (root) ─────────────────────
       - uses: actions/setup-node@v4
         with:

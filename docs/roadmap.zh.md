@@ -1,140 +1,62 @@
 # 路线图
 
-这是一份方向文档，不是发布排期。它列出我们想推进的几个方向，以及每个方向下的几个具体
-思路。条目会随着认识的深入而移动、合并或删除。
+这是一份记录 Arbor 后续优化方向的文档，列出我们关心的几类开放问题及目前的初步设想。
+这些问题与设想会随团队认识的深入而调整、合并或删除，欢迎贡献与建议。
 
-## 定位
+## 方向一：核心功能优化
 
-已经有一些自动研究系统和本计划的一部分重叠。最接近的是
-[AutoSOTA](https://github.com/tsinghua-fib-lab/AutoSOTA)：一个闭环系统，会做文献调研、
-改研究代码、跑实验，并维护一个按领域组织、覆盖 100+ 篇论文的 per-paper leaderboard，
-带 baseline 复现和防篡改的 eval。
+### 1. 实验进程管理优化
 
-这种重叠是真实的，所以我们明确：Arbor **不打算**做第二个"自动优化已发表论文"的榜单。
+目前 Arbor 由单一 Coordinator 维护整棵 hypothesis tree，在更长的研究周期下可能出现能力
+退化。我们计划优化其上下文管理，使长程研究中积累的关键信息不致逐步失真或丢失。
 
-- 我们要做的价值是一个**可复用、可校验、别人能复跑的基准格式**，而不是我们自己战绩的目录。
-- 我们靠 **held-out 纪律**——只有在受保护的 test split 上超过一定 margin 才保留改动——
-  而不是"刷出了更高的数字"。
-- 我们首先把这套基准集合当成 **Arbor 自己的回归 harness**（用于检验 Coordinator/Executor），
-  其次才是对外展示。
+### 2. Idea 质量评估
 
----
+目前提出的 idea，其新颖性与可行性主要依赖基础模型自身的能力，缺乏外部的显式反馈进行
+监督。我们考虑引入类似批判者（critic）的角色，对候选 idea 给出独立评估，以提升这一环节
+的质量。
 
-## 方向一 —— 基本功能
+### 3. 自进化能力
 
-### 1.1 搜索与文献接地的 ideation ✅ *（已完成）* {#sec-1-1}
+目前 Arbor 围绕单一 benchmark 进行优化，所得经验难以迁移到相似或同领域的其他任务。我们
+计划增加研究轨迹的导出能力，并在此基础上抽取、整合可复用的技能与经验。
 
-最初搜索被隔离在独立的 `SearchAgent` 里，idea 生成与 Coordinator 不能直接搜索开放网络。
-这让基准运行保持公平——系统无法从网上抄一个成品 idea——但对真实研究太严：真实研究里，
-人会先读相关工作再提方向。
+### 4. 对复合优化目标的支持
 
-已落地（默认关，基准运行保持公平），用法见
-[检索与外部知识](search.zh.md)指南：
+当前 Arbor 的优化目标仅支持标量分数。我们考虑支持更复合的目标形式——如 rubric、LLM judge 评分与多目标优化——并相应解决这类目标下的可比较性与防作弊问题。
 
-- **接地 ideation**（`search.grounded_ideation`，默认关）——ideation 阶段 Coordinator 获得
-  `ResearchSearch` 工具（intent：related-work / survey / lookup / explore）。
-- **分离而非禁止**——接地 lane 与新颖性审计 lane 不共享状态；塑造了某个 idea 的来源记录在该
-  节点的 `grounding` 字段，与审计的 `related_work` 分开。
-- **可插拔后端**，在 `search.backends` 后扇出合并：alphaXiv + Jina（免 key）、Serper + Exa REST
-  （需 key）、**Exa via MCP**（免 key）、以及自托管 endpoint。读取页面经 Jina reader 免 key
-  （raw-`requests` 兜底），无需 browse 端点。
-- **全文与 PDF 摄取**——接地 lane 用更大的 token 预算（`research_visit_tokens`）读取并解析 PDF，
-  让模型能读到论文的方法/结果章节，而不只是摘要。
+### 5. Agent 科研能力的提升
 
-尚未做：把每次检索的轮次/visit 上限做成硬性成本约束，以及给出按 run 的检索成本（归在
-[1.3](#sec-1-3)）。
+让 Agent 能根据实验进展自主获取更多实验信息，而不局限于预先给定的 metric，从而为后续
+决策提供更充分的依据。
 
-### 1.2 评测纪律 ✅ *（已完成）*
+## 方向二：外部资源优化
 
-已完成：
+### 1. 扩展到更多样化的长程优化场景
 
-- **Split 溯源**——每个分数在数据模型层就标注来自哪个 split（`dev`/`test`），并在
-  REPORT.md、CLI dashboard 和 WebUI 中带标签渲染。验证过的 B_test 分数在 merge 时自动
-  记录到节点与 trunk meta。
-- **eval 防篡改**——受保护路径在运行中（而不仅 merge 时）做哈希校验。每个 executor 的
-  worktree 会拿到其受保护文件的 SHA-256 清单，外加尽力而为的 OS 只读；运行中任何改动都会
-  作废该节点的 dev 分数并阻止 merge（发出 `eval.protected_tamper`）。这堵上了 executor
-  通过写 `data/`/`evaluation/` 抬高 B_dev 的口子。
-- **污染自检**——声明式的 `eval_contract.contamination` 块（发布日期、`is_public`、
-  canary）驱动一个非阻塞的 preflight 警告和一次 INIT 期探测（`eval.contamination_assessed`，
-  记录在 tree meta）。声明式启发式 + canary 扫描现已随包；LLM 成员推断探测作为后续。
+现有任务格式假设静态优化（环境固定、无状态）。我们计划增加带环境状态的任务形态，以
+支持办公等真实场景下的 agent harness 优化。
 
-关于 `contamination` 块与运行时受保护路径强制，见 [Plugins](plugins.md) 指南。
+### 2. 自动化环境收集
 
-### 1.3 成本与调度 {#sec-1-3}
+收集并扩充更全面的 benchmark 场景，覆盖各类 LLM 与 Agent 评测基准，使 Arbor 能支持更广
+的优化场景。
 
-- 预算分层（smoke → pilot → full），让较大的扫描可预估。
-- 在运行开始前就给出按 backend / 按 run 的成本核算，而不是事后。
+## 方向三：用户体验
 
----
+### 1. 扩展更多实际示例与场景
 
-## 方向二 —— 外部资源
+目前免安装 demo 已经落地，但能端到端跑通的示例仅有 `algotune_knn` 一个。我们计划将其
+扩展为一个小型示例画廊，覆盖不同类型的任务与受众（如 Kaggle / MLE、prompt 与 harness
+工程、小规模训练等），每个示例配以可复制的命令与简短录屏，并将上手门槛控制在笔记本或
+免费 API key 即可在数分钟内跑通。
 
-### 2.1 按 domain 划分的 benchmark zoo 🚧 *（格式与工具已完成；集合扩充中）*
+### 2. 优化单次自动实验的导出与展示能力
 
-一个经过筛选、统一格式的任务集合，按领域分组（如 CV、NLP、时序、优化），每个任务用一篇已
-发表论文的结果作为要超越的 baseline。它以 `arbor-zoo/` 放在仓库里，每个基准一个文件夹，
-首要用途是 Arbor 自己的回归 harness——而非我们战绩的榜单。
-
-已完成——Task Pack 格式、校验器，以及第一个参考 pack。完整规格与校验器的检查清单见
-[Benchmark Zoo](zoo.md) 指南：
-
-- **Task Pack 格式**，每个基准一个文件夹，契约写在 **README front-matter** 里（metric、
-  dev/test 切分、baseline、编辑面）——*没有单独的清单文件*。同目录还有：可运行的 baseline
-  （如 `solution.py`）、一个受保护的 eval 入口（`eval.sh` / `eval.py`），对 `dev`|`test`
-  各打印恰好一行 `score: <float>`、一个可选的受保护 `task.py`（确定性的 `generate_problem`
-  + *独立的* `is_solution` 验证器，让“快但错”无法得分），以及一份 `PROVENANCE.md` 卡片
-  （来源、license、setup/环境、baseline 复现、污染、注意事项）。
-- **`arbor benchmark verify`** 为一个 pack 把关：front-matter + `PROVENANCE.md` 可解析
-  且完整、eval 在 dev 与 test 上各产出一个可解析的分数、baseline 能复现声称的数字、
-  dev/test held out、受保护路径不可写、eval 确定且离线。任何一项失败即非零退出——未经校验
-  的 pack 不进 zoo。**`arbor benchmark list`** 索引一个 zoo 目录（只是索引，不是榜单）。
-- **参考 pack + 脚手架**：
-  [`algotune_knn`](https://github.com/RUC-NLPIR/Arbor/tree/main/arbor-zoo/algotune_knn)
-  （已校验）和一个可复制的 `_template`。以 `_` 开头的文件夹被工具跳过。
-
-尚未做：
-
-- **扩充集合**到 3–5 个高质量、人工核对的 pack，覆盖不同任务形态，以 `algotune_knn` 为
-  参考。质量封顶，不是数量封顶。
-- **`arbor benchmark add`**——半自动转换:从一句话需求出发,agent 找到数据集,在交互终端里
-  询问用户**用哪个数据集、baseline 从哪来**(收割现成的 / 按你描述的方法实现 / 上网找),并产出
-  一个可运行草稿,再由校验器和人工接受这一步把关(起草自动、接受需校验——绝不自动接受)。*实现*
-  baseline 的 agent 与之后优化它的 loop 分开,使评测不自证。*(已实现:discovery + 交互式
-  bring-up;bring-up 的推理仍在打磨。)*
-- **把一个 pack 降级成 [plugin](plugins.md)** 以实现一行改写重定向——front-matter 契约
-  复用 `plugin` 词汇（`eval_contract` / `protected_paths`），应能几乎无返工地导出（与 2.2
-  配套）。
-
-### 2.2 插件库
-
-在 `mle_kaggle` 之外提供更多范例领域插件，与上面的 Task Pack 配对，让把 Arbor 重定向到
-一个领域只需改一行 `plugin:`。
-
-### 2.3 搜索 backend ✅ *（已完成）*
-
-方向一里的可插拔后端（alphaXiv、Jina、Serper、Exa REST、Exa via MCP、自托管 endpoint）同样是
-外部资源——用户接入一次，便可跨 run 复用。见
-[1.1](#sec-1-1)与[检索指南](search.zh.md)。
-
----
-
-## 方向三 —— 用户展示
-
-### 3.1 Zoo / leaderboard 视图
-
-一个可浏览的 benchmark zoo 页面：按领域展示论文 baseline、Arbor 结果、提升，以及复现它的
-确切命令。重点是可复现——每一行都是读者能复跑的东西——而不是一个计分牌。
-
-### 3.2 运行对比
-
-- 对同一基准的两次 run 做 diff。
-- 在同一任务上跨 model/provider 比较 Idea Tree。
-
-### 3.3 报告与导出
-
-在今天的 `REPORT.md` 和 HTML 导出基础上，加入引用（每个 idea 背后的接地来源）和按 run
-的成本明细。
+目前已有 `REPORT.md`、HTML 导出、实时 dashboard 与只读 WebUI，仍缺少对单次实验的理解
+与横向对比。我们计划支持 run 之间的对比（对同一任务的多次 run 做 diff，或跨 model /
+provider 比较 idea tree），在报告中补充引用（每个 idea 背后的文献来源）与成本明细，并为
+benchmark 集合提供可复现视图——每一条目均附带可直接复跑的命令。
 
 ---
 

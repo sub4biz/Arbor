@@ -46,6 +46,10 @@ def empty_state_dict() -> dict[str, Any]:
         "gate": None,
         "paused": False,
         "interactive": False,
+        # True only for the file-backed (keyless) monitor, where token/cache
+        # accounting is owned by the host harness and not observable by Arbor —
+        # the browser uses this to hide those panels rather than show 0s.
+        "keyless": False,
     }
 
 
@@ -166,5 +170,9 @@ def state_to_dict(s: Any) -> dict[str, Any]:
         "companion": companion,
         "gate": _gate_to_dict(getattr(s, "pending_gate", None)),
         "paused": bool(getattr(s, "paused", False)),
+        # The live path always has token/cache telemetry; flag it explicitly so the
+        # shape matches empty_state_dict() / the keyless snapshot (browser hides the
+        # token/cache cards only when keyless is true).
+        "keyless": False,
         # interactive is set by the server (it knows whether input is enabled).
     }

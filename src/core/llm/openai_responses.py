@@ -392,8 +392,18 @@ class OpenAIResponsesProvider(LLMProvider):
         usage = Usage()
         raw_usage = getattr(raw, "usage", None)
         if raw_usage:
-            usage.input_tokens = int(getattr(raw_usage, "input_tokens", 0) or 0)
+            total_input = int(getattr(raw_usage, "input_tokens", 0) or 0)
             usage.output_tokens = int(getattr(raw_usage, "output_tokens", 0) or 0)
+            # Responses counts cached prompt tokens inside ``input_tokens`` (under
+            # ``input_tokens_details.cached_tokens``); split them out so cache hits
+            # are visible and ``total_input_tokens`` doesn't double-count.
+            details = getattr(raw_usage, "input_tokens_details", None)
+            cached = getattr(details, "cached_tokens", None) if details is not None else None
+            if cached is None and isinstance(details, dict):
+                cached = details.get("cached_tokens")
+            cached = int(cached or 0)
+            usage.input_tokens = max(0, total_input - cached)
+            usage.cache_read_tokens = cached
 
         stop_reason = "tool_use" if tool_calls else "end_turn"
         if getattr(raw, "status", None) == "incomplete":

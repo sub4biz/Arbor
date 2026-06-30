@@ -33,4 +33,4 @@ executor:
   max_turns: 30
 
 ui:
-  interaction_mode: review   # auto | direction | review | collaborative
+  interaction_mode: auto   # auto | direction | review | collaborative

@@ -45,6 +45,7 @@ from typing import Any
 
 from ..coordinator.idea_tree import IdeaTree, Node
 from ..report.generator import generate_report
+from . import session_timing
 
 # Branches we will never merge *into* — a hard safety rail for the trunk.
 PROTECTED_BRANCHES = {"main", "master"}
@@ -79,9 +80,55 @@ def _safe_run_name(run_name: str) -> str:
     return safe or "session"
 
 
+def _stable_arbor_base(cwd: str | Path) -> Path:
+    """Anchor the ``.arbor`` root at the *main* working tree, not a linked one.
+
+    Host coding agents frequently drive a run from inside a linked git worktree
+    (e.g. ``.claude/worktrees/<branch>``). Each worktree has its own working
+    directory, so a session created under ``<worktree>/.arbor`` is invisible from
+    the main checkout and appears to *vanish* the moment the agent switches
+    branches/worktrees. To keep session state stable regardless of which worktree
+    or branch is active, we resolve the main worktree root (the parent of the
+    shared git common dir) and anchor ``.arbor`` there.
+
+    Only linked worktrees are redirected: a normal single checkout (where the
+    current toplevel already *is* the main worktree) and any non-git directory
+    are returned unchanged, so existing behaviour is preserved.
+    """
+    base = Path(cwd).resolve()
+    try:
+        rc_top, top = git(base, "rev-parse", "--show-toplevel")
+        if rc_top != 0 or not top:
+            return base
+        rc_common, common = git(base, "rev-parse", "--git-common-dir")
+        if rc_common != 0 or not common:
+            return base
+        common_path = Path(common)
+        if not common_path.is_absolute():
+            common_path = (base / common_path).resolve()
+        main_root = common_path.parent.resolve()
+        toplevel = Path(top).resolve()
+        # Redirect only when we are inside a *linked* worktree (toplevel differs
+        # from the main worktree root); otherwise keep the caller's directory. A
+        # real main worktree root has a ``.git`` entry (dir or file). Inside a git
+        # submodule, ``--git-common-dir`` points at the parent repo's
+        # ``.git/modules/<name>`` whose parent is ``.git/modules`` — not a
+        # worktree — so the ``.git`` check keeps us from anchoring there.
+        if main_root != toplevel and (main_root / ".git").exists():
+            return main_root
+    except Exception:  # pragma: no cover - git absent / unexpected layout
+        return base
+    return base
+
+
 def session_dir(cwd: str | Path, run_name: str) -> Path:
-    """Return ``<cwd>/.arbor/sessions/<run_name>`` (the per-run session root)."""
-    return Path(cwd).resolve() / ".arbor" / "sessions" / _safe_run_name(run_name)
+    """Return ``<base>/.arbor/sessions/<run_name>`` (the per-run session root).
+
+    ``base`` is normally *cwd*, but is redirected to the main working tree when
+    *cwd* is a linked git worktree (see :func:`_stable_arbor_base`) so the
+    session — and the WebUI watching it — survive branch/worktree switches.
+    """
+    return _stable_arbor_base(cwd) / ".arbor" / "sessions" / _safe_run_name(run_name)
 
 
 def coordinator_dir(cwd: str | Path, run_name: str) -> Path:
@@ -285,6 +332,9 @@ def tree_add_node(
         status=status,  # type: ignore[arg-type]
     )
     tree.add_node(node)
+    session_timing.record_event(
+        coordinator_dir(cwd, run_name), node_id, "proposed", label=hypothesis,
+    )
     return {"node_id": node_id, "depth": node.depth, "parent_id": parent_id}
 
 
@@ -299,6 +349,14 @@ def tree_update_node(cwd: str | Path, run_name: str, node_id: str, **fields: Any
     if tree.get_node(node_id) is None:
         raise ValueError(f"node {node_id!r} not found")
     tree.update_node(node_id, **updates)
+    new_status = updates.get("status")
+    if new_status:
+        node = tree.get_node(node_id)
+        session_timing.record_event(
+            coordinator_dir(cwd, run_name), node_id, str(new_status),
+            label=(node.code_ref if node else None),
+            score=updates.get("score", node.score if node else None),
+        )
     return {"node_id": node_id, "updated": sorted(updates)}
 
 
@@ -308,6 +366,9 @@ def tree_prune(cwd: str | Path, run_name: str, node_id: str, reason: str = "") -
     if tree.get_node(node_id) is None:
         raise ValueError(f"node {node_id!r} not found")
     tree.prune_node(node_id, reason)
+    session_timing.record_event(
+        coordinator_dir(cwd, run_name), node_id, "pruned", label=reason or None,
+    )
     return {"node_id": node_id, "status": "pruned", "reason": reason}
 
 
@@ -526,6 +587,9 @@ def worktree_create(
             raise RuntimeError(f"git worktree add failed: {out}")
 
     tree.update_node(node_id, status="running", code_ref=branch)
+    session_timing.record_event(
+        coordinator_dir(cwd, run_name), node_id, "running", label=branch,
+    )
     return {"worktree": str(wt), "branch": branch, "node_id": node_id}
 
 
@@ -662,6 +726,10 @@ def git_merge_branch(
 
     tree.meta["test_trunk_score"] = float(test_score)
     tree.update_node(node_id, status="merged", code_ref=source_branch)
+    session_timing.record_event(
+        coordinator_dir(cwd, run_name), node_id, "merged",
+        label=source_branch, score=test_score,
+    )
     return {
         "merged": source_branch,
         "target": target,
