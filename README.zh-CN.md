@@ -46,6 +46,7 @@
 
 ## 📣 最新动态
 
+- **2026-06-30** — **Arbor 会从自己的运行中学习。** 每次运行都会留下具体、可复用的发现——数据集上能提分的特性、需要避开的坑；下次类似任务在 intake 时把它们召回，于是 agent 从经验出发，而不是从零开始。🧠
 - **2026-06-22** — **内置文献检索与想法新颖性审查。** Arbor 现在可以通过 [alphaXiv](https://www.alphaxiv.org) 公共 API 把研究建立在已有工作之上——零配置，无需搜索端点或密钥。动手前用 `arbor idea-check "<你的想法>"` 审查任意想法的新颖性，或让 Coordinator 自动为每个新分支把关。详见[文献检索与新颖性审查](#-文献检索与新颖性审查)。🔎
 - **2026-06-18** — Arbor 被美国知名科技媒体 [VentureBeat](https://venturebeat.com/) 报道：[《New AI optimization framework beats Claude Code and Codex by 2.5x on the same compute budget》](https://venturebeat.com/orchestration/new-ai-optimization-framework-beats-claude-code-and-codex-by-2-5x-on-the-same-compute-budget)。📰
 - **2026-06-12** — Arbor 原生 CLI 运行时与智能体技能套件（Codex / Claude Code）正式发布。🚀
