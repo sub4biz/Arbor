@@ -39,7 +39,7 @@ https://github.com/user-attachments/assets/49c1a306-d2e9-49d6-9c83-65e38a62df30
 
 ## 📣 News
 
-- **2026-06** — **Arbor learns from its own runs.** Every run now leaves concrete, reusable findings — a dataset quirk that lifted the metric, a trap an executor or the harness fell into — captured live (the agent logs them mid-run) and mined again at the end. When you start a similar task, intake surfaces the relevant past findings and asks whether to reuse them, so the agent begins from hard-won experience instead of scratch. 🧠
+- **2026-06** — **Arbor learns from its own runs.** Each run leaves concrete, reusable findings — a dataset quirk that helped, a trap to avoid; the next similar task recalls them at intake, so the agent starts from experience instead of scratch. 🧠
 - **2026-06** — **Built-in literature search & idea novelty checks.** Arbor can now ground its research in prior work via the public [alphaXiv](https://www.alphaxiv.org) API — zero config, no search endpoint or key. Novelty-check any idea before you build it with `arbor idea-check "<your idea>"`, or let the Coordinator vet every new branch automatically. See [Literature Search & Novelty Checks](#-literature-search--novelty-checks). 🔎
 - **2026-06** — Arbor was featured by [VentureBeat](https://venturebeat.com/), one of the leading tech media outlets in the US: ["New AI optimization framework beats Claude Code and Codex by 2.5x on the same compute budget"](https://venturebeat.com/orchestration/new-ai-optimization-framework-beats-claude-code-and-codex-by-2-5x-on-the-same-compute-budget). 📰
 - **2026-06** — Arbor's native CLI runtime and Agent Skill Suite (Codex / Claude Code) are released. 🚀
