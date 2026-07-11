@@ -5,7 +5,10 @@ from __future__ import annotations
 import os
 import uuid
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Callable
+
+
+PathAuthorizer = Callable[[str], str | None]
 
 
 class Tool(ABC):
@@ -25,10 +28,23 @@ class Tool(ABC):
     # If a result exceeds persist_threshold, save to disk and return preview.
     # Set to 0 to always persist, or float('inf') to never persist.
     persist_threshold: int = 30_000
+    # Interactive agents may use a control tool whose completed result must be
+    # handed to the frontend before any further model call. Autonomous agents
+    # ignore this unless ``AgentConfig.yield_on_text`` is enabled.
+    yield_after_execute: bool = False
 
-    def __init__(self, *, cwd: str, workspace_dir: str | None = None):
+    def __init__(
+        self,
+        *,
+        cwd: str,
+        workspace_dir: str | None = None,
+        path_authorizer: PathAuthorizer | None = None,
+        persist_results: bool = True,
+    ):
         self.cwd = cwd
         self.workspace_dir = workspace_dir
+        self.path_authorizer = path_authorizer
+        self.persist_results = persist_results
 
     @abstractmethod
     async def execute(self, **kwargs: Any) -> str:
@@ -52,6 +68,37 @@ class Tool(ABC):
         """
         return None
 
+    def should_yield_after_execute(self, output: str) -> bool:
+        """Whether this completed result should return control to the UI."""
+
+        return self.yield_after_execute
+
+    def authorize_path(self, path: str) -> tuple[str, str | None]:
+        """Canonicalize *path* and apply global plus session-level guards.
+
+        Most agents have no session authorizer and retain their existing path
+        behavior. Interactive frontends can supply one to enforce a dynamic
+        user-approved scope. Returning the canonical path ensures a symlink
+        cannot pass the check and then be opened through its lexical alias.
+        """
+        from .path_guard import check_path_allowed
+
+        blocked = check_path_allowed(path)
+        if blocked:
+            return path, blocked
+        if self.path_authorizer is None:
+            return path, None
+
+        try:
+            canonical = os.path.realpath(path)
+        except (OSError, ValueError):
+            canonical = path
+        blocked = check_path_allowed(canonical)
+        if blocked:
+            return canonical, blocked
+        blocked = self.path_authorizer(canonical)
+        return canonical, blocked
+
     def to_api_schema(self) -> dict[str, Any]:
         """Convert to the format expected by the LLM API (Anthropic tool schema)."""
         return {
@@ -70,6 +117,8 @@ class Tool(ABC):
         """
         if len(text) <= self.persist_threshold:
             return text
+        if not self.persist_results:
+            return self._truncate(text)
 
         # Persist to disk
         persist_root = self.workspace_dir or self.cwd

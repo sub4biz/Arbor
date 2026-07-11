@@ -13,10 +13,9 @@ from .base import Tool
 class FileReadTool(Tool):
     name = "Read"
     description = (
-        "Reads a file from the local filesystem. You can access any file "
-        "directly by using this tool.\n"
-        "Assume this tool is able to read all files on the machine. If the "
-        "user provides a path to a file assume that path is valid.\n"
+        "Reads a file from the local filesystem, subject to the active path "
+        "scope and safety policy. If access is blocked, ask the user to approve "
+        "the exact path instead of searching elsewhere.\n"
         "\n"
         "Usage:\n"
         "- The file_path parameter must be an absolute path, not a relative path\n"
@@ -29,8 +28,8 @@ class FileReadTool(Tool):
         "at 1\n"
         "- This tool can read PDF files (.pdf). For large PDFs, provide the "
         "pages parameter to read specific page ranges (e.g., pages: \"1-5\")\n"
-        "- This tool can only read files, not directories. To read a directory, "
-        "use an ls command via the Bash tool.\n"
+        "- This tool can only read files, not directories. To find files in a "
+        "directory, use the Glob tool.\n"
         "- If you read a file that exists but has empty contents you will "
         "receive a warning."
     )
@@ -64,8 +63,7 @@ class FileReadTool(Tool):
         if not os.path.isabs(file_path):
             file_path = os.path.join(self.cwd, file_path)
 
-        from .path_guard import check_path_allowed
-        blocked = check_path_allowed(file_path)
+        file_path, blocked = self.authorize_path(file_path)
         if blocked:
             return f"BLOCKED: {blocked}"
 

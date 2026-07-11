@@ -54,3 +54,17 @@ def test_legacy_models_keep_budget_tokens(model):
     out = _thinking(model, reasoning_effort="low")
     assert out["thinking"] == {"type": "enabled", "budget_tokens": 1024}
     assert out["output_config"] is None
+
+
+def test_internal_message_metadata_is_not_sent_to_anthropic():
+    provider = _provider("claude-sonnet-4-6")
+    messages = provider._cache_messages([
+        {
+            "role": "user",
+            "content": "continue",
+            "_internal": "premature_stop_nudge",
+        }
+    ])
+
+    assert "_internal" not in messages[0]
+    assert messages[0]["role"] == "user"

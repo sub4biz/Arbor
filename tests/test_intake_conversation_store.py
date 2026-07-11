@@ -49,6 +49,51 @@ def test_save_then_load_round_trips_messages(tmp_path):
     assert load_messages(rec) == messages
 
 
+def test_save_redacts_tool_result_payloads(tmp_path):
+    rec = new_conversation(tmp_path)
+    messages = [
+        {"role": "user", "content": "read the file"},
+        {
+            "role": "assistant",
+            "content": [{"type": "tool_use", "id": "t1", "name": "Read", "input": {}}],
+        },
+        {
+            "role": "user",
+            "content": [
+                {"type": "tool_result", "tool_use_id": "t1", "content": "sensitive file body"}
+            ],
+        },
+    ]
+
+    save_conversation(rec, messages)
+
+    persisted = load_messages(rec)
+    assert "sensitive file body" not in rec.messages_path.read_text(encoding="utf-8")
+    assert persisted[-1]["content"][0]["content"] == (
+        "[tool result omitted from persisted intake history; "
+        "ask the user to re-authorize the path before re-reading]"
+    )
+
+
+def test_save_redacts_context_summaries_that_may_contain_tool_data(tmp_path):
+    rec = new_conversation(tmp_path)
+    save_conversation(
+        rec,
+        [
+            {"role": "user", "content": "read"},
+            {
+                "role": "user",
+                "_internal": "context_summary",
+                "content": "summary accidentally contains sensitive file body",
+            },
+        ],
+    )
+
+    raw = rec.messages_path.read_text(encoding="utf-8")
+    assert "sensitive file body" not in raw
+    assert load_messages(rec)[-1]["_internal"] == "context_summary"
+
+
 def test_meta_records_title_turns_and_launched(tmp_path):
     rec = new_conversation(tmp_path)
     save_conversation(rec, _msgs("optimize the dev score please"), launched=False)
@@ -126,3 +171,32 @@ def test_new_conversation_ids_are_unique(tmp_path):
         save_conversation(rec, _msgs("x"))
         ids.add(rec.conv_id)
     assert len(ids) == 5
+
+
+def test_find_conversations_rejects_metadata_id_mismatch(tmp_path):
+    rec = new_conversation(tmp_path)
+    save_conversation(rec, _msgs("safe"))
+    meta = json.loads(rec.meta_path.read_text(encoding="utf-8"))
+    meta["conv_id"] = "../../outside"
+    rec.meta_path.write_text(json.dumps(meta), encoding="utf-8")
+
+    assert find_conversations(tmp_path) == []
+
+
+def test_find_conversations_rejects_symlinked_directory(tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "meta.json").write_text(
+        json.dumps({"conv_id": "conv_20260711_000000"}),
+        encoding="utf-8",
+    )
+    root = conversations_root(tmp_path)
+    root.mkdir(parents=True)
+    link = root / "conv_20260711_000000"
+    try:
+        link.symlink_to(outside, target_is_directory=True)
+    except OSError as exc:  # pragma: no cover - platform permission edge
+        import pytest
+        pytest.skip(f"symlink unavailable: {exc}")
+
+    assert find_conversations(tmp_path) == []

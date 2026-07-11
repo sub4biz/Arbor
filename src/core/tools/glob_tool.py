@@ -44,16 +44,34 @@ class GlobTool(Tool):
         if not os.path.isabs(path):
             path = os.path.join(self.cwd, path)
 
-        from .path_guard import check_path_allowed
-        blocked = check_path_allowed(path)
+        path, blocked = self.authorize_path(path)
         if blocked:
             return f"BLOCKED: {blocked}"
+
+        pattern_path = pathlib.PurePath(pattern)
+        if pattern_path.is_absolute() or ".." in pattern_path.parts:
+            return (
+                "BLOCKED: glob patterns must stay below the authorized search "
+                "root; use the path argument for an explicitly approved root"
+            )
 
         base = pathlib.Path(path)
         if not base.exists():
             return f"Error: Directory not found: {path}"
         if not base.is_dir():
             return f"Error: {path} is not a directory."
+
+        # Authorize the non-wildcard prefix before globbing. This prevents a
+        # symlink such as ``approved/link -> /outside`` from being traversed.
+        prefix_parts: list[str] = []
+        for part in pattern_path.parts:
+            if any(char in part for char in "*?["):
+                break
+            prefix_parts.append(part)
+        if prefix_parts:
+            _prefix, blocked = self.authorize_path(str(base.joinpath(*prefix_parts)))
+            if blocked:
+                return f"BLOCKED: {blocked}"
 
         try:
             matches = list(base.glob(pattern))
@@ -66,6 +84,9 @@ class GlobTool(Tool):
         for m in matches:
             parts = m.relative_to(base).parts
             if any(p in skip_dirs for p in parts):
+                continue
+            _canonical, blocked = self.authorize_path(str(m))
+            if blocked:
                 continue
             if m.is_file():
                 filtered.append(m)
