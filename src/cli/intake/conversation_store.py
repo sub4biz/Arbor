@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -45,6 +46,7 @@ MESSAGES_NAME = "messages.jsonl"
 META_NAME = "meta.json"
 
 _TITLE_MAX = 80
+_CONV_ID_RE = re.compile(r"conv_\d{8}_\d{6}(?:_\d+)?")
 
 
 def _utc_now_iso() -> str:
@@ -135,8 +137,20 @@ def save_conversation(
     Updates ``rec`` in place (``updated_at``, ``turns``, ``title``, ``launched``)
     so the caller's handle stays current across repeated saves.
     """
-    rec.dir.mkdir(parents=True, exist_ok=True)
-    write_messages(rec.messages_path, messages)
+    if not _CONV_ID_RE.fullmatch(rec.conv_id):
+        raise ValueError(f"invalid conversation id: {rec.conv_id!r}")
+    root = conversations_root(rec.cwd)
+    root.mkdir(parents=True, exist_ok=True)
+    if root.is_symlink():
+        raise OSError(f"refusing symlinked conversation root: {root}")
+    try:
+        root.resolve(strict=True).relative_to(rec.cwd.resolve(strict=True))
+    except (OSError, ValueError) as exc:
+        raise OSError(f"conversation root escapes project: {root}") from exc
+    rec.dir.mkdir(parents=False, exist_ok=True)
+    if rec.dir.is_symlink():
+        raise OSError(f"refusing symlinked conversation directory: {rec.dir}")
+    write_messages(rec.messages_path, _messages_for_disk(messages))
 
     rec.updated_at = _utc_now_iso()
     rec.turns = _count_user_turns(messages)
@@ -158,15 +172,33 @@ def find_conversations(cwd: str | os.PathLike[str]) -> list[ConversationRecord]:
     Defensive: a dir without a parseable ``meta.json`` is skipped, never fatal.
     """
     root = conversations_root(cwd)
-    if not root.is_dir():
+    if not root.is_dir() or root.is_symlink():
+        return []
+    try:
+        resolved_root = root.resolve(strict=True)
+        resolved_root.relative_to(Path(cwd).resolve(strict=True))
+    except (OSError, ValueError):
         return []
 
     records: list[ConversationRecord] = []
     for conv_dir in root.iterdir():
-        if not conv_dir.is_dir():
+        if (
+            not conv_dir.is_dir()
+            or conv_dir.is_symlink()
+            or not _CONV_ID_RE.fullmatch(conv_dir.name)
+        ):
+            continue
+        try:
+            conv_dir.resolve(strict=True).relative_to(resolved_root)
+        except (OSError, ValueError):
             continue
         data = _load_json(conv_dir / META_NAME)
-        if not isinstance(data, dict) or "conv_id" not in data:
+        if (
+            not isinstance(data, dict)
+            or data.get("conv_id") != conv_dir.name
+            or (conv_dir / META_NAME).is_symlink()
+            or (conv_dir / MESSAGES_NAME).is_symlink()
+        ):
             continue
         try:
             records.append(ConversationRecord.from_meta(Path(cwd), data))
@@ -189,13 +221,17 @@ def latest_unfinished(cwd: str | os.PathLike[str]) -> ConversationRecord | None:
 
 
 def _count_user_turns(messages: list[dict[str, Any]]) -> int:
-    return sum(1 for m in messages if m.get("role") == "user")
+    return sum(
+        1
+        for m in messages
+        if m.get("role") == "user" and not m.get("_internal")
+    )
 
 
 def _derive_title(messages: list[dict[str, Any]]) -> str:
     """First user message, flattened to a short single line."""
     for m in messages:
-        if m.get("role") != "user":
+        if m.get("role") != "user" or m.get("_internal"):
             continue
         text = _message_text(m.get("content"))
         text = " ".join(text.split())
@@ -215,6 +251,46 @@ def _message_text(content: Any) -> str:
         ]
         return " ".join(p for p in parts if p)
     return ""
+
+
+def _messages_for_disk(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Copy history while removing file contents returned by intake tools.
+
+    The live agent keeps full results in memory for the current conversation.
+    Persisted chat is resumable context, not a second copy of every file the
+    user authorized Arbor to inspect.
+    """
+
+    sanitized: list[dict[str, Any]] = []
+    for message in messages:
+        if message.get("_internal") == "context_summary":
+            sanitized.append({
+                "role": "user",
+                "_internal": "context_summary",
+                "content": (
+                    "[compacted context omitted from persisted intake history; "
+                    "restate the current goal and re-authorize any needed paths]"
+                ),
+            })
+            continue
+        content = message.get("content")
+        if not isinstance(content, list):
+            sanitized.append(dict(message))
+            continue
+        blocks: list[Any] = []
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "tool_result":
+                blocks.append({
+                    **block,
+                    "content": (
+                        "[tool result omitted from persisted intake history; "
+                        "ask the user to re-authorize the path before re-reading]"
+                    ),
+                })
+            else:
+                blocks.append(block)
+        sanitized.append({**message, "content": blocks})
+    return sanitized
 
 
 def _atomic_write_json(path: Path, data: dict[str, Any]) -> None:

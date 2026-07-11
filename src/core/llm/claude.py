@@ -239,7 +239,12 @@ class ClaudeProvider(LLMProvider):
         """
         if not messages:
             return messages
-        out = [dict(m) for m in messages]
+        # Framework-only metadata (for example ``_internal`` control markers)
+        # is persisted locally but is not part of Anthropic's message schema.
+        out = [
+            {key: value for key, value in m.items() if not key.startswith("_")}
+            for m in messages
+        ]
         last = out[-1]
         content = last.get("content")
         if isinstance(content, str):

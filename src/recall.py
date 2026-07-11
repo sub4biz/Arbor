@@ -19,6 +19,27 @@ _STOP = {"the", "a", "an", "to", "of", "and", "for", "on", "in", "with", "withou
          "maximize", "minimize", "improve", "optimize", "score", "test", "dev", "task"}
 
 
+def _safe_experience_files(cwd: str) -> list[Path]:
+    """Return non-symlink experience files contained by this project's root."""
+
+    sessions = Path(cwd).resolve() / ".arbor" / "sessions"
+    if not sessions.is_dir() or sessions.is_symlink():
+        return []
+    out: list[Path] = []
+    for session in sessions.iterdir():
+        if not session.is_dir() or session.is_symlink():
+            continue
+        exp = session / "EXPERIENCE.md"
+        if not exp.is_file() or exp.is_symlink():
+            continue
+        try:
+            exp.resolve(strict=True).relative_to(sessions)
+        except (OSError, ValueError):
+            continue
+        out.append(exp)
+    return out
+
+
 def _tokens(text: str) -> set[str]:
     return {w for w in re.findall(r"[a-z0-9]+", (text or "").lower()) if len(w) > 2 and w not in _STOP}
 
@@ -31,12 +52,9 @@ def _score(topic: set[str], experience: set[str]) -> float:
 
 def find_similar(cwd: str, topic: str, *, limit: int = 3, threshold: float = 0.25) -> list[dict[str, Any]]:
     """Return prior sessions ranked by topic overlap: [{name, path, score, text}]."""
-    sessions = Path(cwd) / ".arbor" / "sessions"
-    if not sessions.is_dir():
-        return []
     tt = _tokens(topic)
     hits: list[dict[str, Any]] = []
-    for exp in sessions.glob("*/EXPERIENCE.md"):
+    for exp in _safe_experience_files(cwd):
         text = exp.read_text(encoding="utf-8")
         s = _score(tt, _tokens(text))
         if s >= threshold:
@@ -47,11 +65,8 @@ def find_similar(cwd: str, topic: str, *, limit: int = 3, threshold: float = 0.2
 
 def list_experiences(cwd: str, limit: int = 8) -> list[tuple[str, str]]:
     """[(session_name, first-line summary)] of prior runs that left experience."""
-    sessions = Path(cwd) / ".arbor" / "sessions"
     out: list[tuple[str, str]] = []
-    if not sessions.is_dir():
-        return out
-    for exp in sorted(sessions.glob("*/EXPERIENCE.md"), reverse=True)[:limit]:
+    for exp in sorted(_safe_experience_files(cwd), reverse=True)[:limit]:
         desc = ""
         for ln in exp.read_text(encoding="utf-8").splitlines():
             if ln.startswith("description:"):
@@ -74,11 +89,11 @@ def compose_from_sessions(cwd: str, names: list[str]) -> str:
     project, so it picks which prior runs actually transfer. Falls back to nothing
     if the named sessions lack experience.
     """
-    sessions = Path(cwd) / ".arbor" / "sessions"
+    available = {exp.parent.name: exp for exp in _safe_experience_files(cwd)}
     hits = []
     for name in names or []:
-        exp = sessions / name / "EXPERIENCE.md"
-        if exp.exists():
+        exp = available.get(str(name))
+        if exp is not None:
             hits.append({"name": name, "score": "selected", "text": exp.read_text(encoding="utf-8")})
     return _compose(hits)
 

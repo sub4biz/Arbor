@@ -41,6 +41,14 @@ class AgentConfig(ProxyModel):
     # ── Agent loop (per-spawn, not shared) ───────────────────────────
     max_turns: int = 100
     max_tool_concurrency: int = 10
+    # Interactive frontends need a real user-turn boundary. When enabled, any
+    # visible assistant text ends the current run; tool calls returned beside
+    # that text are discarded rather than executed behind a displayed question.
+    yield_on_text: bool = False
+    # Autonomous agents benefit from a nudge when they promise work without
+    # calling a tool. Interactive chat agents must disable this: ordinary
+    # phrases such as "接下来" or "I will" often introduce a question.
+    premature_stop_nudges: bool = True
 
     # ── Experiment settings ──────────────────────────────────────────
     experiment_cmd: str | None = None

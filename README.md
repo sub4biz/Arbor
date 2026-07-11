@@ -236,8 +236,9 @@ flow; `arbor doctor` diagnoses the install. Both `quickstart` and `setup` write
 `~/.arbor/config.yaml`, so day-to-day you can just run `arbor`
 with no flags. The first thing Arbor does is an **intake conversation** that turns your
 goal, target directory, metric, baseline, budget, dev/test discipline, and artifact
-paths into a one-screen **Arbor Research Contract**. Once you confirm it, the live
-dashboard takes over.
+paths into a one-screen **Arbor Research Contract**. Read/discuss requests stay in a
+scoped, read-only mode; experiment plans are staged and launch only after a later explicit
+confirmation. Once you confirm the resolved contract, the live dashboard takes over.
 
 ```bash
 # Point at a benchmark directory and a config

@@ -27,7 +27,6 @@ from ...core.agent import Agent
 from ...core.config import AgentConfig
 from ...core.llm.base import LLMProvider
 from ...core.tools.base import Tool
-from ...core.tools.bash import BashTool
 from ...core.tools.file_read import FileReadTool
 from ...core.tools.glob_tool import GlobTool
 from ...core.tools.grep import GrepTool
@@ -42,7 +41,13 @@ from .conversation_store import (
 )
 from .display import IntakeDisplay
 from .launch_tool import LaunchExperimentTool, LaunchPlan, LaunchState
-from .system_prompt import build_system_prompt
+from .scope import (
+    IntakeMode,
+    IntakePathPolicy,
+    infer_intake_mode,
+    is_explicit_launch_approval,
+)
+from .system_prompt import build_discussion_system_prompt, build_system_prompt
 from ..resume_picker import ResumableSession
 
 
@@ -82,8 +87,8 @@ async def run_intake(
     - ``ResumableSession`` — the user ran ``/resume`` and picked a past run
     - ``None``             — the user aborted
 
-    `starting_cwd` is the directory the user invoked the CLI from. It is
-    only a hint — the agent must confirm or correct it before launching.
+    `starting_cwd` is the directory the user invoked the CLI from. It is the
+    default project boundary until the user explicitly names another target.
     The intake workspace dir (tool persistence, etc.) lives next to it.
 
     The conversation itself is auto-saved every turn under
@@ -97,31 +102,60 @@ async def run_intake(
     intake_workspace = (workspace_dir or (starting_cwd / CONFIG_DIR_NAME / "_intake")).resolve()
     intake_workspace.mkdir(parents=True, exist_ok=True)
 
-    # Tools are constructed with starting_cwd as the base for *relative*
-    # paths; absolute paths work unrestricted, which is what we want here.
-    tools: list[Tool] = [
-        FileReadTool(cwd=str(starting_cwd), workspace_dir=str(intake_workspace)),
-        GlobTool(cwd=str(starting_cwd), workspace_dir=str(intake_workspace)),
-        GrepTool(cwd=str(starting_cwd), workspace_dir=str(intake_workspace)),
-        BashTool(cwd=str(starting_cwd), workspace_dir=str(intake_workspace)),
-        LaunchExperimentTool(cwd=str(starting_cwd), workspace_dir=str(intake_workspace), state=state),
+    path_policy = IntakePathPolicy(starting_cwd)
+
+    # Intake is read-only. Every file tool shares a mutable, canonical path
+    # policy, so a user correction changes the enforced scope before the next
+    # model call. Shell access belongs to the launched coordinator, not to a
+    # planning/discussion chat.
+    file_tools: list[Tool] = [
+        FileReadTool(
+            cwd=str(starting_cwd),
+            workspace_dir=str(intake_workspace),
+            path_authorizer=path_policy.authorize,
+            persist_results=False,
+        ),
+        GlobTool(
+            cwd=str(starting_cwd),
+            workspace_dir=str(intake_workspace),
+            path_authorizer=path_policy.authorize,
+            persist_results=False,
+        ),
+        GrepTool(
+            cwd=str(starting_cwd),
+            workspace_dir=str(intake_workspace),
+            path_authorizer=path_policy.authorize,
+            persist_results=False,
+        ),
     ]
+    launch_tool = LaunchExperimentTool(
+        cwd=str(starting_cwd),
+        workspace_dir=str(intake_workspace),
+        state=state,
+        path_authorizer=path_policy.authorize,
+    )
+    tools: list[Tool] = [*file_tools, launch_tool]
 
     agent_config = AgentConfig(
         cwd=str(starting_cwd),
         provider=_provider_label(provider),
         model=getattr(provider, "model", "unknown"),
         max_turns=intake_max_turns,
+        yield_on_text=True,
+        premature_stop_nudges=False,
         llm_retry_attempts=INTAKE_LLM_RETRY_ATTEMPTS,
         llm_retry_base_delay=INTAKE_LLM_RETRY_BASE_DELAY,
         llm_retry_max_delay=INTAKE_LLM_RETRY_MAX_DELAY,
-        auto_git=False,  # the intake agent is read-only — no commits
+        auto_git=False,  # intake exposes no write/shell tools
     )
 
     agent = Agent(
         provider=provider,
         tools=tools,
-        system_prompt=build_system_prompt(starting_cwd=str(starting_cwd)),
+        system_prompt=build_system_prompt(
+            starting_cwd=str(starting_cwd),
+            approved_scope=path_policy.describe(),
+        ),
         config=agent_config,
     )
 
@@ -142,6 +176,19 @@ async def run_intake(
         prior = latest_unfinished(starting_cwd)
         if prior is not None:
             agent.messages = seal_interrupted_tail(load_messages(prior))
+            # Conversation prose is resumable; filesystem authority is not.
+            # Persisted transcripts and LLM-generated compaction summaries are
+            # untrusted inputs, so the user must name paths again in a fresh
+            # terminal turn before tools can read them.
+            path_policy.reset(mode=IntakeMode.DISCUSSION)
+            _configure_intake_agent(
+                agent,
+                mode=path_policy.mode,
+                starting_cwd=starting_cwd,
+                path_policy=path_policy,
+                file_tools=file_tools,
+                launch_tool=launch_tool,
+            )
             conv = prior
             _console.print(
                 f"[green]Continuing your last conversation[/] "
@@ -185,10 +232,11 @@ async def run_intake(
             action = _handle_slash(
                 user_text,
                 agent,
-                tools,
+                list(agent.tools.values()),
                 state,
                 starting_cwd=starting_cwd,
                 model=getattr(provider, "model", None),
+                path_policy=path_policy,
             )
             if action == "quit":
                 return None
@@ -201,8 +249,60 @@ async def run_intake(
                 # reloaded it into the agent. Switch onward autosaves to that
                 # record and keep chatting in this same intake loop.
                 conv = state.resume_conversation
+                _configure_intake_agent(
+                    agent,
+                    mode=path_policy.mode,
+                    starting_cwd=starting_cwd,
+                    path_policy=path_policy,
+                    file_tools=file_tools,
+                    launch_tool=launch_tool,
+                )
+                continue
+            if action == "reset":
+                _configure_intake_agent(
+                    agent,
+                    mode=path_policy.mode,
+                    starting_cwd=starting_cwd,
+                    path_policy=path_policy,
+                    file_tools=file_tools,
+                    launch_tool=launch_tool,
+                )
                 continue
             continue
+
+        # Route every real user turn before the LLM sees it. Discussion mode
+        # has no launch capability and no implicit cwd access; planning mode is
+        # confined to the starting project plus explicitly named paths.
+        mode = infer_intake_mode(user_text, path_policy.mode)
+        path_policy.update(user_text, mode)
+        # Approve the exact staged plan in controller code. The confirmation
+        # never goes back through the model, so it cannot silently rewrite the
+        # cwd/instruction or attach a different tool call after the user says go.
+        if (
+            mode == IntakeMode.PLANNING
+            and state.pending_plan is not None
+            and state.pending_plan_presented
+            and is_explicit_launch_approval(user_text)
+        ):
+            agent.messages.append({"role": "user", "content": user_text})
+            state.plan = state.pending_plan
+            state.pending_plan = None
+            state.pending_plan_presented = False
+            _persist()
+            return state.plan
+
+        # Any non-approval real message edits or rejects the candidate. The
+        # model must stage a fresh plan reflecting the new instruction.
+        state.pending_plan = None
+        state.pending_plan_presented = False
+        _configure_intake_agent(
+            agent,
+            mode=mode,
+            starting_cwd=starting_cwd,
+            path_policy=path_policy,
+            file_tools=file_tools,
+            launch_tool=launch_tool,
+        )
 
         # Hand off to the agent under a compact display.
         try:
@@ -213,6 +313,18 @@ async def run_intake(
             if typer.confirm("Quit intake?", default=False):
                 return None
             continue
+
+        if (
+            mode == IntakeMode.PLANNING
+            and state.pending_plan is not None
+            and agent.stop_reason == "awaiting_user"
+        ):
+            state.pending_plan_presented = True
+            _print_research_contract(state.pending_plan)
+            _console.print(
+                "[bold]Start this exact staged plan?[/bold] "
+                "[dim](reply yes/go/start, or describe an edit)[/dim]\n"
+            )
         if _is_llm_failure_reply(reply):
             _print_llm_failure_hint(
                 provider=agent_config.provider,
@@ -236,6 +348,31 @@ async def run_intake(
 
 
 # ── helpers ────────────────────────────────────────────────────────
+
+
+def _configure_intake_agent(
+    agent: Agent,
+    *,
+    mode: IntakeMode,
+    starting_cwd: Path,
+    path_policy: IntakePathPolicy,
+    file_tools: list[Tool],
+    launch_tool: LaunchExperimentTool,
+) -> None:
+    """Atomically refresh prompt and capabilities for one user turn."""
+
+    active_tools = [*file_tools, launch_tool] if mode == IntakeMode.PLANNING else file_tools
+    agent.tools = {tool.name: tool for tool in active_tools}
+    if mode == IntakeMode.DISCUSSION:
+        agent.system_prompt = build_discussion_system_prompt(
+            starting_cwd=str(starting_cwd),
+            approved_scope=path_policy.describe(),
+        )
+    else:
+        agent.system_prompt = build_system_prompt(
+            starting_cwd=str(starting_cwd),
+            approved_scope=path_policy.describe(),
+        )
 
 
 def _is_llm_failure_reply(reply: str | None) -> bool:
@@ -541,7 +678,7 @@ def _print_plan_accepted(plan: LaunchPlan | None) -> None:
         for n in plan.notes:
             lines.append(f"  - {n}")
     _console.print()
-    _console.print(Panel("\n".join(lines), title="Plan accepted — handing off",
+    _console.print(Panel("\n".join(lines), title="Staged plan",
                          border_style="green"))
 
 
@@ -596,6 +733,8 @@ def _print_resumed_history(messages: list[dict]) -> None:
     """
     rendered = False
     for m in messages:
+        if m.get("_internal"):
+            continue
         text = _visible_text(m.get("content"))
         if not text:
             continue
@@ -661,6 +800,7 @@ def _handle_slash(
     *,
     starting_cwd: Path | None = None,
     model: str | None = None,
+    path_policy: IntakePathPolicy | None = None,
 ) -> str:
     cmd = line.lower().split()[0]
     if cmd == "/help":
@@ -695,6 +835,10 @@ def _handle_slash(
             return "continue"        # user declined (N) → stay in intake
         if isinstance(chosen, ConversationRecord):
             agent.messages = seal_interrupted_tail(load_messages(chosen))
+            if path_policy is not None:
+                path_policy.reset(mode=IntakeMode.DISCUSSION)
+            state.pending_plan = None
+            state.pending_plan_presented = False
             state.resume_conversation = chosen
             _console.print(
                 f"[green]Resumed conversation[/] "
@@ -716,25 +860,52 @@ def _handle_slash(
         _console.print(f"  [dim]skills loaded[/dim] {escape(loaded_skills)}")
         _console.print(f"  [dim]skills unloaded[/dim] {escape(unloaded_skills)}")
         _console.print(f"  [dim]turns[/dim] {agent.total_turns}")
-        _console.print(f"  [dim]pending plan[/dim] {'yes' if state.plan else 'no'}")
+        if path_policy is not None:
+            _console.print(f"  [dim]mode[/dim] {escape(path_policy.mode.value)}")
+            _console.print(
+                f"  [dim]approved scope[/dim] {escape(path_policy.describe())}"
+            )
+        _console.print(
+            f"  [dim]suppressed mixed tool calls[/dim] "
+            f"{len(agent.suppressed_tool_uses)}"
+        )
+        pending = state.plan is not None or state.pending_plan is not None
+        _console.print(f"  [dim]pending plan[/dim] {'yes' if pending else 'no'}")
     elif cmd == "/plugin":
+        before = (state.plugin, state.plugin_profile, state.plugin_mode)
         _handle_plugin_command(line, state, starting_cwd=starting_cwd)
+        after = (state.plugin, state.plugin_profile, state.plugin_mode)
+        if after != before:
+            state.pending_plan = None
+            state.pending_plan_presented = False
     elif cmd == "/skill":
+        before = tuple(state.unloaded_skills)
         _handle_skill_command(line, state, starting_cwd=starting_cwd)
+        if tuple(state.unloaded_skills) != before:
+            state.pending_plan = None
+            state.pending_plan_presented = False
     elif cmd in ("/quit", "/abort"):
         return "quit"
     elif cmd == "/reset":
         agent.messages.clear()
+        if path_policy is not None:
+            path_policy.reset()
+        state.plan = None
+        state.pending_plan = None
+        state.pending_plan_presented = False
+        agent.suppressed_tool_uses.clear()
         _console.print("[dim]history cleared[/dim]")
+        return "reset"
     elif cmd == "/tools":
         for t in tools:
             _console.print(f"  - {t.name}: {t.description.splitlines()[0]}")
     elif cmd in ("/plan", "/contract"):
-        if state.plan:
+        preview = state.plan or state.pending_plan
+        if preview:
             if cmd == "/contract":
-                _print_research_contract(state.plan)
+                _print_research_contract(preview)
             else:
-                _print_plan_accepted(state.plan)
+                _print_plan_accepted(preview)
         else:
             _console.print("[dim]no contract yet[/dim]")
     else:

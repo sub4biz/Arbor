@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from ...core.tools.base import Tool
+from ...core.tools.base import PathAuthorizer, Tool
 
 
 PluginMode = Literal["inherit", "load", "disabled"]
@@ -43,6 +43,11 @@ class LaunchState:
     plugin_profile: str | None = None
     plugin_mode: PluginMode = "inherit"
     unloaded_skills: list[str] = field(default_factory=list)
+    # Launch authorization is controlled by the REPL, not inferred by the LLM.
+    # The tool stages exact arguments first; a later real user turn may approve
+    # that same immutable plan without another model call.
+    pending_plan: LaunchPlan | None = None
+    pending_plan_presented: bool = False
     # Set when the user runs `/resume` and picks a past session. Typed Any to
     # avoid importing resume_picker here; it holds a ``ResumableSession``.
     resume_target: Any = None
@@ -59,20 +64,20 @@ class LaunchState:
 class LaunchExperimentTool(Tool):
     name = "LaunchExperiment"
     description = (
-        "Call this tool when (a) you have confirmed with the user which project "
-        "directory the experiment runs against, (b) you have a precise refined "
-        "instruction, and (c) the user has explicitly approved starting. "
-        "Calling this tool ends the planning conversation and hands the plan "
-        "to the coordinator.\n"
+        "Stage the exact research plan that you want to show the user. Calling "
+        "this tool does NOT launch anything. It records immutable candidate "
+        "arguments; after the tool result, present that plan and ask the user "
+        "for approval. The CLI controller launches the same staged plan only "
+        "after a later, explicit user confirmation.\n"
         "\n"
         "Before calling this tool you MUST:\n"
         "  1. Know the absolute path of the target project (the `cwd` argument)\n"
         "  2. Have read enough of that project to write a precise instruction\n"
-        "  3. Have shown the user your proposed plan in plain language\n"
-        "  4. Have received explicit user confirmation (e.g. 'yes', 'go', 'start')\n"
+        "  3. Be ready to present the proposed plan in plain language after "
+        "this tool returns\n"
         "\n"
-        "Do not call this tool speculatively. If unsure, ask the user a clarifying "
-        "question first."
+        "Do not call this tool speculatively. If required details are unclear, "
+        "ask the user a clarifying question first."
     )
     input_schema = {
         "type": "object",
@@ -147,11 +152,27 @@ class LaunchExperimentTool(Tool):
         },
         "required": ["cwd", "instruction"],
     }
-    is_read_only = True  # Doesn't touch the filesystem
+    # Stateful control operation: serialize duplicate calls even though it does
+    # not write project files.
+    is_read_only = False
+    yield_after_execute = True
 
-    def __init__(self, *, cwd: str, workspace_dir: str | None = None,
-                 state: LaunchState) -> None:
-        super().__init__(cwd=cwd, workspace_dir=workspace_dir)
+    def should_yield_after_execute(self, output: str) -> bool:
+        return output.startswith("STAGED —")
+
+    def __init__(
+        self,
+        *,
+        cwd: str,
+        workspace_dir: str | None = None,
+        state: LaunchState,
+        path_authorizer: PathAuthorizer | None = None,
+    ) -> None:
+        super().__init__(
+            cwd=cwd,
+            workspace_dir=workspace_dir,
+            path_authorizer=path_authorizer,
+        )
         self._state = state
 
     async def execute(self, **kwargs: Any) -> str:
@@ -167,6 +188,11 @@ class LaunchExperimentTool(Tool):
         if self._state.launched:
             return ("ERROR: experiment was already launched in this session; "
                     "you should stop now and let the coordinator run")
+        if self._state.pending_plan is not None:
+            return (
+                "ERROR: a plan is already staged. Wait for the user's response "
+                "instead of staging another plan in the same turn."
+            )
 
         # Validate the target dir exists. If not, tell the agent so it can
         # re-ask the user instead of launching against nothing.
@@ -174,6 +200,10 @@ class LaunchExperimentTool(Tool):
         if not resolved.is_absolute():
             return (f"ERROR: cwd must be an absolute path (got {target_cwd!r}). "
                     f"Ask the user for the full path.")
+        authorized, blocked = self.authorize_path(str(resolved))
+        if blocked:
+            return f"BLOCKED: {blocked}"
+        resolved = _P(authorized)
         if not resolved.exists() or not resolved.is_dir():
             return (f"ERROR: cwd does not exist or is not a directory: {resolved}. "
                     f"Ask the user to confirm the path.")
@@ -192,11 +222,11 @@ class LaunchExperimentTool(Tool):
             plugin_mode=self._state.plugin_mode,
             unloaded_skills=list(self._state.unloaded_skills),
         )
-        self._state.plan = plan
+        self._state.pending_plan = plan
+        self._state.pending_plan_presented = False
         return (
-            "OK — plan accepted. The planning conversation is now over and the "
-            "coordinator will take over. End your turn with a brief confirmation "
-            "to the user; do not call any more tools."
+            "STAGED — no experiment has launched. The CLI will present this "
+            "exact plan and wait for a later, explicit user confirmation."
         )
 
 

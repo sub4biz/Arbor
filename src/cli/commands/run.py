@@ -44,7 +44,7 @@ def run_command(
     max_turns: int | None = typer.Option(None, "--max-turns",
                                          help="Hard cap on coordinator ReAct turns. Use as a cost/runaway safety valve."),
     intake_max_turns: int = typer.Option(30, "--intake-max-turns",
-                                         help="Max planning-chat turns before launch. Rarely needed."),
+                                         help="Max internal agent turns per intake message. Rarely needed."),
     run_name: str | None = typer.Option(None, "--run-name", help="Session name under .arbor/sessions/. Defaults to timestamp."),
     resume: bool = typer.Option(
         False, "--resume",
@@ -263,6 +263,11 @@ def run_command(
             plan_cwd = Path(outcome.cwd).resolve()
             unloaded_skills = list(outcome.unloaded_skills)
             refined_instruction = outcome.instruction
+            if outcome.notes:
+                refined_instruction += (
+                    "\n\nAdditional user constraints:\n- "
+                    + "\n- ".join(outcome.notes)
+                )
             selected_plugin = outcome.plugin
             selected_plugin_profile = outcome.plugin_profile
             selected_plugin_mode = outcome.plugin_mode
@@ -302,10 +307,9 @@ def run_command(
 
     # ── 2. Quick essentials check against plan_cwd ─────────────────
     #
-    # The intake agent already runs its own sanity pass (git status,
-    # eval.sh, etc.) inline during the chat, so we don't show a
-    # ceremonial preflight section here — just run silently and only
-    # surface fatal issues as a red panel.
+    # Intake is deliberately read-only. Run the deterministic essentials
+    # preflight after the staged plan is approved, and surface only failures by
+    # default so planning stays conversational without hiding execution.
     #
     # Resolve the plugin's eval_contract so the contamination preflight can
     # warn (zero-network) when the benchmark is likely in pretraining data.
@@ -790,6 +794,14 @@ def _resolve_effective_options(
     max_cycles: int | None,
     max_turns: int | None,
 ) -> dict[str, Any]:
+    # ``load_layered_defaults`` intentionally preserves structured blocks.
+    # Normalize the documented ``llm: {provider, model, ...}`` form onto the
+    # flat lookup surface used below, while keeping legacy top-level values as
+    # higher-precedence compatibility aliases.
+    nested_llm = project_defaults.get("llm")
+    if isinstance(nested_llm, dict):
+        project_defaults = {**nested_llm, **project_defaults}
+        project_defaults.pop("llm", None)
     if project_defaults.get("provider") is not None:
         provider_source = "project"
         eff_provider = project_defaults.get("provider")

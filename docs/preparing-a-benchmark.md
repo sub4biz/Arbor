@@ -33,18 +33,20 @@ score: 0.8123
 A simple working baseline already in the repo is ideal — it gives Arbor a number to beat
 and confirms the eval actually runs.
 
-!!! tip "Only have code? The intake agent can build the eval for you"
+!!! tip "Only have code? Intake can plan the eval setup with you"
     You don't need an eval script — or even a dev/test split — *before* you start. If your
     repo is just code, launch `arbor` anyway: in the intake chat the agent asks what
-    "better" means, then offers to **scaffold a minimal eval** (and, if you want, carve a
-    **dev/held-out split**) for you to confirm. No held-out set and don't want one? You can
+    "better" means, then stages a plan whose first coordinator task can **scaffold a minimal
+    eval** (and, if you want, carve a **dev/held-out split**) after you confirm. No held-out
+    set and don't want one? You can
     iterate on a single split — the agent will just note that the final score has no
     held-out guard. See [Describe the task](#2-describe-the-task-readme-or-just-tell-the-cli).
 
-!!! tip "Let the intake agent do the plumbing"
+!!! tip "Let Arbor do the plumbing after approval"
     You don't have to pre-initialize git, `chmod +x` your script, or run the eval yourself.
-    When you launch `arbor`, the intake agent will quietly do those setup steps for you
-    (and confirm the eval produces a score) before the study starts.
+    Intake itself is read-only: it inspects files inside the approved scope and stages the
+    contract. After you confirm, deterministic preflight and the coordinator handle setup
+    and evaluation work; intake never runs shell commands behind a displayed question.
 
 ## 2. Describe the task — README *or* just tell the CLI
 

@@ -30,10 +30,13 @@ changing eval or data"`). Omit it to start with the intake chat.
 
 ### Default flow
 
-1. Open an interactive chat with the intake agent.
-2. The agent confirms which project directory to work on (the `--cwd` flag is only a hint).
-3. When you agree on a plan, the agent launches the experiment.
-4. You confirm the research contract shown in the terminal.
+1. Open an interactive chat with the intake agent. Read/discuss requests stay in scoped,
+  read-only discussion mode; launch planning is enabled only for an optimization/run goal.
+2. The agent confirms which project directory to work on. `--cwd` is the default boundary;
+  external paths must be named explicitly and are re-authorized after chat resume.
+3. The agent stages an exact plan and shows it to you. A later, explicit confirmation launches
+  that same staged plan; visible questions never execute hidden tool calls.
+4. You confirm the fully resolved research contract shown in the terminal.
 5. A quick preflight runs against the chosen project.
 6. The coordinator runs to completion and writes `REPORT.md`.
 
@@ -45,7 +48,7 @@ changing eval or data"`). Omit it to start with the intake chat.
 | `--config, -c PATH` | Project YAML config. Defaults to `research_config.yaml` / `arbor.yaml` / `autoresearch.yaml` in the target project. |
 | `--max-cycles N` | Max completed/skipped/failed idea experiments before finalizing. |
 | `--max-turns N` | Hard cap on coordinator ReAct turns — a cost/runaway safety valve. |
-| `--intake-max-turns N` | Max planning-chat turns before launch (default `30`). |
+| `--intake-max-turns N` | Max internal agent turns for each intake message (default `30`). |
 | `--run-name NAME` | Session name under `.arbor/sessions/`. Defaults to a timestamp. |
 | `--resume` | Resume an interrupted run from its checkpoint in the existing workspace/session. |
 | `--workspace-dir PATH` | Session/artifact directory override. Default `<target>/.arbor/sessions/<run_name>`. |

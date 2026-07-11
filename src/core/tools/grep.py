@@ -114,8 +114,7 @@ class GrepTool(Tool):
         if not os.path.isabs(path):
             path = os.path.join(self.cwd, path)
 
-        from .path_guard import check_path_allowed
-        blocked = check_path_allowed(path)
+        path, blocked = self.authorize_path(path)
         if blocked:
             return f"BLOCKED: {blocked}"
 

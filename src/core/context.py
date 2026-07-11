@@ -404,6 +404,7 @@ class ContextManager:
         return [
             {
                 "role": "user",
+                "_internal": "context_summary",
                 "content": (
                     f"[Conversation Summary — compaction #{self._compact_count + 1}]\n\n"
                     f"{summary_text}"

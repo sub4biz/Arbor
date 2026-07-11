@@ -214,9 +214,11 @@ class Agent:
         # views (plain text and {name,input} tool calls).
         self.assistant_texts: list[str] = []
         self.tool_uses: list[dict[str, Any]] = []
+        self.suppressed_tool_uses: list[dict[str, Any]] = []
         self.total_turns = 0
         # Why the loop exited, surfaced to callers alongside total_turns:
         #   "finished"  — model produced a final answer with no tool calls
+        #   "awaiting_user" — interactive text yielded control to the frontend
         #   "max_turns" — exhausted the turn budget without a final answer
         # Stays None if the run was cancelled mid-loop (e.g. timeout), since the
         # coroutine never reaches a return. Callers detect that case otherwise.
@@ -396,18 +398,46 @@ class Agent:
             if response.stop_reason != "max_tokens":
                 self._max_tokens_recovery_count = 0
 
-            # 5. Print assistant text (if any)
             text = response.get_text()
+            tool_calls = response.get_tool_calls()
+
+            # Interactive frontends use visible text as the explicit boundary
+            # between agent work and the human's next turn. A model may return
+            # text and tool calls together; executing those calls after showing
+            # a question makes the UI look idle while the agent keeps acting.
+            # Keep the prose/reasoning in history, remove the unexecuted calls
+            # so every persisted tool call remains paired with a result, and
+            # yield control immediately. Autonomous agents retain the original
+            # text+tool behavior because this option defaults to False.
+            if self.config.yield_on_text and text.strip():
+                if tool_calls:
+                    self.suppressed_tool_uses.extend(
+                        {"name": call.name, "input": call.input}
+                        for call in tool_calls
+                    )
+                    self.messages[-1] = {
+                        "role": "assistant",
+                        "content": _without_tool_calls(response.raw_content),
+                    }
+                    _print_status(
+                        "Visible assistant text ended the interactive turn; "
+                        f"discarded {len(tool_calls)} accompanying tool call(s)."
+                    )
+                _print_assistant(text)
+                self.assistant_texts.append(text)
+                self.stop_reason = "awaiting_user"
+                return text
+
+            # 5. Print assistant text (if any)
             if text:
                 _print_assistant(text)
                 self.assistant_texts.append(text)
 
             # 6. Check tool calls
-            tool_calls = response.get_tool_calls()
-            for _tc in tool_calls:
-                self.tool_uses.append({"name": _tc.name, "input": _tc.input})
             if not tool_calls:
                 if (
+                    self.config.premature_stop_nudges
+                    and
                     no_tool_nudges < 3
                     and turn < self.config.max_turns
                     and _looks_like_premature_no_tool_stop(text)
@@ -418,6 +448,7 @@ class Agent:
                     )
                     self.messages.append({
                         "role": "user",
+                        "_internal": "premature_stop_nudge",
                         "content": (
                             "Your previous response described future work but did not call any tools. "
                             "Continue now by calling the appropriate tool(s). Do not report completion "
@@ -442,6 +473,39 @@ class Agent:
 
             no_tool_nudges = 0
 
+            # A frontend control tool changes interaction state and must be the
+            # only action in its response. Reject the entire batch rather than
+            # executing ordinary tools before/alongside a staged launch.
+            if self.config.yield_on_text:
+                control_calls = [
+                    call
+                    for call in tool_calls
+                    if getattr(self.tools.get(call.name), "yield_after_execute", False)
+                ]
+                if control_calls and len(tool_calls) != 1:
+                    self.suppressed_tool_uses.extend(
+                        {"name": call.name, "input": call.input}
+                        for call in tool_calls
+                    )
+                    self.messages.append({
+                        "role": "user",
+                        "content": [
+                            ToolResultBlock(
+                                tool_use_id=call.id,
+                                content=(
+                                    "Error: interactive control tools must be "
+                                    "called alone; no tools in this batch were executed."
+                                ),
+                                is_error=True,
+                            ).to_content_block()
+                            for call in tool_calls
+                        ],
+                    })
+                    continue
+
+            for _tc in tool_calls:
+                self.tool_uses.append({"name": _tc.name, "input": _tc.input})
+
             # 6. Execute tools
             _print_status(
                 f"Turn {turn}: executing {len(tool_calls)} tool(s) "
@@ -456,6 +520,19 @@ class Agent:
                 "role": "user",
                 "content": [r.to_content_block() for r in results],
             })
+            result_by_id = {result.tool_use_id: result for result in results}
+            if self.config.yield_on_text and any(
+                tool is not None
+                and (result := result_by_id.get(call.id)) is not None
+                and tool.should_yield_after_execute(result.content)
+                for call in tool_calls
+                if (tool := self.tools.get(call.name)) is not None
+            ):
+                _print_status(
+                    "Interactive control tool completed; yielding to the frontend."
+                )
+                self.stop_reason = "awaiting_user"
+                return ""
 
         _print_status(f"Reached max turns ({self.config.max_turns}).")
         self.stop_reason = "max_turns"
@@ -721,6 +798,34 @@ def _retry_delay(*, attempt: int, base_delay: float, max_delay: float) -> float:
         return 0.0
     jitter = min(delay * 0.1, 3.0)
     return round(delay + random.uniform(0, jitter), 2)
+
+
+_TOOL_CALL_BLOCK_TYPES = frozenset({
+    "tool_use",
+    "function_call",
+    "custom_tool_call",
+    "tool_search_call",
+})
+
+
+def _without_tool_calls(content: Any) -> Any:
+    """Remove unexecuted tool-call blocks from assistant history.
+
+    Providers use different history shapes: Anthropic/OpenAI-chat adapters
+    normalize calls to ``tool_use``, while the Responses API keeps native
+    ``function_call`` items. Interactive turns must not persist either shape
+    without a matching tool result.
+    """
+    if not isinstance(content, list):
+        return content
+    return [
+        block
+        for block in content
+        if not (
+            isinstance(block, dict)
+            and block.get("type") in _TOOL_CALL_BLOCK_TYPES
+        )
+    ]
 
 
 def _looks_like_premature_no_tool_stop(text: str) -> bool:
